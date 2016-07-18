@@ -53,13 +53,43 @@
         android:id="@+id/listView"
         android:layout_centerHorizontal="true"
         android:layout_below="@+id/linearLayout"
-        android:layout_above="@+id/btnConnect" />
+        android:layout_above="@+id/linerLayoutBottom" />
 
-    <Button
-        android:layout_width="wrap_content"
+
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Connect"
-        android:id="@+id/btnConnect"
         android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true" />
+        android:id="@+id/linerLayoutBottom">
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Connect"
+            android:id="@+id/btnConnect"
+            android:layout_alignParentBottom="true"
+            android:layout_centerHorizontal="true"
+            android:layout_gravity="center_horizontal" />
+
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Close Connection"
+            android:id="@+id/btnCloseConnection"
+            android:layout_below="@+id/listView"
+            android:layout_alignRight="@+id/listView"
+            android:layout_alignEnd="@+id/listView"
+            android:onClick="closeBluetoothConnection" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/receivedDataTextView"
+            android:autoText="false"
+            android:text="Count" />
+
+    </LinearLayout>
 </RelativeLayout>

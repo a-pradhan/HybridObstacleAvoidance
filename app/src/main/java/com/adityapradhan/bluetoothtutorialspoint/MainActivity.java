@@ -13,6 +13,7 @@ import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.IOException;
@@ -29,21 +30,13 @@ public class MainActivity extends AppCompatActivity {
     private BluetoothAdapter BA;
     private Set<BluetoothDevice> pairedDevices;
     BluetoothDevice mDevice;
-    Handler mHandler = new Handler() {
-        @Override
-        public void handleMessage(Message msg) {
-            byte[] writeBuf = (byte[]) msg.obj;
-            int begin = (int) msg.arg1;
-            int end = (int) msg.arg2;
+    ConnectThread connectThread;
+    Handler bluetoothIn;
+    final int handlerState = 0;
 
-            switch (msg.what) {
-                case 1:
-                    String writeMessage = new String(writeBuf);
-                    writeMessage = writeMessage.substring(begin, end);
-                    break;
-            }
-        }
-    };
+    private StringBuilder recDataString = new StringBuilder();
+
+
 
 
     @Override
@@ -52,6 +45,54 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         Log.i("Info", "Start of Main Activity");
+        final TextView receivedDataTextView = (TextView) findViewById(R.id.receivedDataTextView);
+
+        // initialize handler object to receive messages sent by bluetooth module
+        bluetoothIn = new Handler() {
+            public void handleMessage(Message msg) {
+                if(msg.what == handlerState) {
+                    String readMessage = (String) msg.obj;
+                    recDataString.append(readMessage);
+                    int endOfLineIndex = recDataString.indexOf("\n");
+
+                    if(endOfLineIndex > 0) {
+                        String dataInPrint = recDataString.substring(0, endOfLineIndex);
+                        Log.i("Bluetooth", "Data Received via Bluetooth");
+
+                        int dataLength = dataInPrint.length();
+
+                        if(recDataString.charAt(0) == '#') {
+                            String count = recDataString.substring(1,2);
+                            // TODO create textview to display the count
+                            receivedDataTextView.setText(count);
+
+
+                        }
+                        recDataString.delete(0, recDataString.length());
+                        dataInPrint = "";
+
+                    }
+                }
+            }
+        };
+
+
+        //TODO delete redundant handler after identification
+//        Handler mHandler = new Handler() {
+//            @Override
+//            public void handleMessage(Message msg) {
+//                byte[] writeBuf = (byte[]) msg.obj;
+//                int begin = (int) msg.arg1;
+//                int end = (int) msg.arg2;
+//
+//                switch (msg.what) {
+//                    case 1:
+//                        String writeMessage = new String(writeBuf);
+//                        writeMessage = writeMessage.substring(begin, end);
+//                        break;
+//                }
+//            }
+//        };
 
         // initialize button objects
         turnBtOnButton = (Button) findViewById(R.id.btnTurnBluetoothOn);
@@ -59,6 +100,7 @@ public class MainActivity extends AppCompatActivity {
         listDevicesButton = (Button) findViewById(R.id.btnListPairedDevices);
         getVisibleDevicesButton = (Button) findViewById(R.id.btnGetVisibleDevices);
         connectButton = (Button) findViewById(R.id.btnConnect);
+
 
         // initialize bluetooth adapter object
         BA = BluetoothAdapter.getDefaultAdapter();
@@ -83,7 +125,9 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
 
-                ConnectThread connectThread = new ConnectThread(mDevice);
+                // TODO make the connectThread variable a local variable, passed into the method rather than having
+                // it available throughout the class
+                connectThread = new ConnectThread(mDevice);
                 connectThread.start();
             }
         });
@@ -135,6 +179,14 @@ public class MainActivity extends AppCompatActivity {
         // view visible devices
         Intent getVisible = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
         startActivityForResult(getVisible, 0);
+    }
+
+    public void closeBluetoothConnection(View view) {
+        if(connectThread != null) {
+            connectThread.cancel();
+            Log.i("Bluetooth", "bluetooth connection closed successfully");
+        }
+
     }
 
     // interface with bluetooth module
@@ -230,9 +282,24 @@ public class MainActivity extends AppCompatActivity {
         }
 
         public void run() {
-            byte[] buffer = new byte[1024];  // buffer store for the stream
-            int begin = 0;
-            int bytes;  // bytes returned from read()
+//            byte[] buffer = new byte[1024];  // buffer store for the stream
+//            int begin = 0;
+//            int bytes;  // bytes returned from read()
+
+            byte[] buffer = new byte[256];
+            int bytes;
+
+            // Keep looping to listen for received messages
+            while (true) {
+                try {
+                    bytes = mmInStream.read(buffer);            //read bytes from input buffer
+                    String readMessage = new String(buffer, 0, bytes);
+                    // Send the obtained bytes to the UI Activity via handler
+                    bluetoothIn.obtainMessage(handlerState, bytes, -1, readMessage).sendToTarget();
+                } catch (IOException e) {
+                    break;
+                }
+            }
 
 
             // Keep listening to the InputStream until an exception occurs
@@ -256,21 +323,22 @@ public class MainActivity extends AppCompatActivity {
 //                }
 //            }
 
-            while (true) {
-
-                try {
-                    // Read from Input Stream
-                    bytes = mmInStream.read(buffer);
-                    // Send the obtained bytes to the UI activity
-                    mHandler.obtainMessage(9999,bytes, -1, buffer).sendToTarget();
-                } catch (IOException e) {
-                    break;
-                }
-            }
-
-        }
+//            while (true) {
+//
+//                try {
+//                    // Read from Input Stream
+//                    bytes = mmInStream.read(buffer);
+//                    // Send the obtained bytes to the UI activity
+//                    mHandler.obtainMessage(9999,bytes, -1, buffer).sendToTarget();
+//                } catch (IOException e) {
+//                    break;
+//                }
+//            }
+//
+//        }
 
         /* Call this from the main activity to send data to the remote device */
+        }
         public void write(byte[] bytes) {
             try {
                 mmOutStream.write(bytes);
