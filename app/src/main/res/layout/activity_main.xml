@@ -42,7 +42,7 @@
         <Button
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:text="Get Visible"
+            android:text="Get Visiblee"
             android:id="@+id/btnGetVisibleDevices"
             android:onClick="visible"/>
     </LinearLayout>
@@ -51,7 +51,15 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:id="@+id/listView"
-        android:layout_centerVertical="true"
         android:layout_centerHorizontal="true"
-        android:layout_below="@+id/linearLayout"/>
+        android:layout_below="@+id/linearLayout"
+        android:layout_above="@+id/btnConnect" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Connect"
+        android:id="@+id/btnConnect"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true" />
 </RelativeLayout>
