@@ -48,33 +48,75 @@ public class MainActivity extends AppCompatActivity {
         final TextView receivedDataTextView = (TextView) findViewById(R.id.receivedDataTextView);
 
         // initialize handler object to receive messages sent by bluetooth module
+        //TODO create method for string processing
         bluetoothIn = new Handler() {
             public void handleMessage(Message msg) {
-                if(msg.what == handlerState) {
+                if (msg.what == handlerState) {
                     String readMessage = (String) msg.obj;
+                    Log.i("Unparsed String", readMessage);
                     recDataString.append(readMessage);
                     int endOfLineIndex = recDataString.indexOf("\n");
+//
+//
+//                    if(endOfLineIndex > 0) {
+//                        String dataInPrint = recDataString.substring(0, endOfLineIndex);
+//                        //Log.i("Bluetooth", "Data Received via Bluetooth");
+//
+//                        //int dataLength = dataInPrint.length();
+//
+//                        if(recDataString.charAt(0) == '#') {
+//                            String readings = recDataString.substring(1, endOfLineIndex);
+//                            // TODO create textview to display the count
+//                            receivedDataTextView.setText(readings);
+//                            Log.i("Readings", readings);
+//                        }
+//                        recDataString.delete(0, recDataString.length());
+//                        dataInPrint = "";
+//
+//                    } else {
+//                        Log.i("Reading Parse Error", "end of Line index is not bigger than 0, could be null");
+//                    }
 
-                    if(endOfLineIndex > 0) {
-                        String dataInPrint = recDataString.substring(0, endOfLineIndex);
-                        Log.i("Bluetooth", "Data Received via Bluetooth");
+                    int hashIndex = recDataString.indexOf("#");
+                    int newLineIndex = -1;
+                    String partialReading = "";
 
-                        int dataLength = dataInPrint.length();
+                    while (hashIndex != -1) {
 
-                        if(recDataString.charAt(0) == '#') {
-                            String count = recDataString.substring(1,2);
-                            // TODO create textview to display the count
-                            receivedDataTextView.setText(count);
+                        newLineIndex = recDataString.indexOf("\n", newLineIndex+1);
+                        if (newLineIndex != -1) {
+                            //
+                            if (newLineIndex > hashIndex) {
+                                // parse string
+                                String parsedReadings = recDataString.substring(hashIndex + 1, newLineIndex);
+                                // check if there is another hash in the String
+                                hashIndex = recDataString.indexOf("#", hashIndex+1);
 
+                                receivedDataTextView.setText(parsedReadings);
+                                Log.i("Readings", parsedReadings);
+
+
+                            } else {
+                                // partial reading from previous set combined with remainder of reading set in
+                                // subsequent iteration of loop
+                                String endOfReading = recDataString.substring(0, newLineIndex);
+                                String parsedReading = partialReading + endOfReading;
+                                newLineIndex = newLineIndex + 1;
+                                receivedDataTextView.setText(parsedReading);
+                                Log.i("Readings", parsedReading);
+                            }
+
+                        } else {
+                            // partial reading
+                            partialReading = recDataString.substring(hashIndex + 1, recDataString.length());
+                            hashIndex =-1;
 
                         }
-                        recDataString.delete(0, recDataString.length());
-                        dataInPrint = "";
-
                     }
-                }
+           }
             }
-        };
+            };
+
 
 
         //TODO delete redundant handler after identification
@@ -119,9 +161,12 @@ public class MainActivity extends AppCompatActivity {
 
                 pairedDevices = BA.getBondedDevices();
 
+                // obtain the HC-06 device if it is present
                 if (pairedDevices.size() > 0) {
                     for (BluetoothDevice device : pairedDevices) {
+                        if(device.getName().equals("HC-06"))
                         mDevice = device;
+                        break;
                     }
                 }
 
@@ -132,14 +177,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-
-
-
-
     }
-
-
-
 
     // button onClick methods
     public void on(View v) {
@@ -164,7 +202,6 @@ public class MainActivity extends AppCompatActivity {
         ArrayList list = new ArrayList();
 
         for (BluetoothDevice device : pairedDevices) {
-
             list.add(device.getName() + "\n" + device.getAddress());
         }
         Toast.makeText(getApplicationContext(), "Showing Paired Devices", Toast.LENGTH_SHORT).show();
@@ -286,13 +323,21 @@ public class MainActivity extends AppCompatActivity {
 //            int begin = 0;
 //            int bytes;  // bytes returned from read()
 
-            byte[] buffer = new byte[256];
+            byte[] buffer = new byte[512];
             int bytes;
 
             // Keep looping to listen for received messages
             while (true) {
                 try {
                     bytes = mmInStream.read(buffer);            //read bytes from input buffer
+                    // print out array
+                    int bufferSize = 0;
+                    for(byte x : buffer) {
+                        if(x > 0) {
+                            bufferSize++;
+                        }
+                    }
+                    Log.i("Buffer size", Integer.toString(bufferSize));
                     String readMessage = new String(buffer, 0, bytes);
                     // Send the obtained bytes to the UI Activity via handler
                     bluetoothIn.obtainMessage(handlerState, bytes, -1, readMessage).sendToTarget();
@@ -300,6 +345,10 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 }
             }
+
+            // write method to loop through bytes array and check if the value is == null
+            // if a value is equal to null return false - buffer is not full yet
+            // if a value is not equal to null return true - buffer is full -> clear buffer by looping through and
 
 
             // Keep listening to the InputStream until an exception occurs
