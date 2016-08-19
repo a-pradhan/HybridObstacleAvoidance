@@ -25,4 +25,5 @@ dependencies {
     compile 'com.android.support:appcompat-v7:24.0.0'
     compile files('libs/commons-math3-3.6.1.jar')
     compile files('libs/LightHouseAPI.jar')
+    compile 'com.google.android.gms:play-services-appindexing:8.1.0'
 }

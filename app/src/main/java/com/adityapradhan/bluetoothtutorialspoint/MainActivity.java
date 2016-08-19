@@ -3,7 +3,13 @@ package com.adityapradhan.bluetoothtutorialspoint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
+import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
+import android.net.Uri;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.Handler;
 import android.os.Message;
 import android.support.v7.app.AppCompatActivity;
@@ -16,17 +22,25 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.appindexing.Action;
+import com.google.android.gms.appindexing.AppIndex;
+import com.google.android.gms.common.api.GoogleApiClient;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Set;
 import java.util.UUID;
+
+import ucl.LightHouse.LightHouseAPI;
 
 public class MainActivity extends AppCompatActivity {
 
     Button turnBtOnButton, turnBtOffButton, listDevicesButton, getVisibleDevicesButton, connectButton;
     ListView listView;
+
     private BluetoothAdapter BA;
     private Set<BluetoothDevice> pairedDevices;
     BluetoothDevice mDevice;
@@ -35,8 +49,11 @@ public class MainActivity extends AppCompatActivity {
     final int handlerState = 0;
 
     private StringBuilder recDataString = new StringBuilder();
-
-
+    /**
+     * ATTENTION: This was auto-generated to implement the App Indexing API.
+     * See https://g.co/AppIndexing/AndroidStudio for more information.
+     */
+    private GoogleApiClient client;
 
 
     @Override
@@ -46,16 +63,25 @@ public class MainActivity extends AppCompatActivity {
 
         Log.i("Info", "Start of Main Activity");
         final TextView receivedDataTextView = (TextView) findViewById(R.id.receivedDataTextView);
+        final ReadingParser readingParser = new ReadingParser();
 
         // initialize handler object to receive messages sent by bluetooth module
         //TODO create method for string processing
         bluetoothIn = new Handler() {
             public void handleMessage(Message msg) {
                 if (msg.what == handlerState) {
+                    // String obtained by reading from byte buffer
                     String readMessage = (String) msg.obj;
-                    Log.i("Unparsed String", readMessage);
-                    recDataString.append(readMessage);
-                    int endOfLineIndex = recDataString.indexOf("\n");
+                    //Log.i("parsed reading" , readMessage);
+                    String readingString = readingParser.parseReadings(readMessage);
+
+                    if (readingString != null) {
+                        receivedDataTextView.setText(readingString);
+                        Log.i("parsed reading" , readingString);
+                    }
+
+
+ //                   int endOfLineIndex = recDataString.indexOf("\n");
 //
 //
 //                    if(endOfLineIndex > 0) {
@@ -77,46 +103,60 @@ public class MainActivity extends AppCompatActivity {
 //                        Log.i("Reading Parse Error", "end of Line index is not bigger than 0, could be null");
 //                    }
 
-                    int hashIndex = recDataString.indexOf("#");
-                    int newLineIndex = -1;
-                    String partialReading = "";
-
-                    while (hashIndex != -1) {
-
-                        newLineIndex = recDataString.indexOf("\n", newLineIndex+1);
-                        if (newLineIndex != -1) {
-                            //
-                            if (newLineIndex > hashIndex) {
-                                // parse string
-                                String parsedReadings = recDataString.substring(hashIndex + 1, newLineIndex);
-                                // check if there is another hash in the String
-                                hashIndex = recDataString.indexOf("#", hashIndex+1);
-
-                                receivedDataTextView.setText(parsedReadings);
-                                Log.i("Readings", parsedReadings);
-
-
-                            } else {
-                                // partial reading from previous set combined with remainder of reading set in
-                                // subsequent iteration of loop
-                                String endOfReading = recDataString.substring(0, newLineIndex);
-                                String parsedReading = partialReading + endOfReading;
-                                newLineIndex = newLineIndex + 1;
-                                receivedDataTextView.setText(parsedReading);
-                                Log.i("Readings", parsedReading);
-                            }
-
-                        } else {
-                            // partial reading
-                            partialReading = recDataString.substring(hashIndex + 1, recDataString.length());
-                            hashIndex =-1;
-
-                        }
-                    }
-           }
+//                    int hashIndex = recDataString.indexOf("#");
+//                    int newLineIndex = -1;
+//                    String partialReading = "";
+//
+//                    // beginning of a set of reading is found
+//                    while (hashIndex != -1) {
+//
+//                        newLineIndex = recDataString.indexOf("\n", newLineIndex + 1);
+//                        if (newLineIndex != -1) {
+//
+//                            if (newLineIndex > hashIndex) {
+//
+//                                String parsedReading = recDataString.substring(hashIndex + 1, newLineIndex);
+//                                // check if there is another hash in the String indicating another set of readings
+//                                hashIndex = recDataString.indexOf("#", hashIndex + 1);
+//
+//                                receivedDataTextView.setText(parsedReading);
+//                                Log.i("Readings", parsedReading);
+//                                // separate readings and send to server
+//                                // TODO refactor this code
+//                                String[] separatedReadings = parsedReading.split(",");
+//                                String IRLeft = separatedReadings[0];
+//                                String US = separatedReadings[1];
+//                                String IRRight = separatedReadings[2];
+//                                uploadData(IRLeft,US,IRRight);
+//
+//
+//
+//
+//                            } else {
+//                                // partial reading from previous set combined with remainder of reading set in
+//                                // subsequent iteration of loop
+//                                String endOfReading = recDataString.substring(0, newLineIndex);
+//                                String parsedReading = partialReading + endOfReading;
+//                                newLineIndex = newLineIndex + 1;
+//                                receivedDataTextView.setText(parsedReading);
+//                                Log.i("Readings", parsedReading);
+//                                String[] separatedReadings = parsedReading.split(",");
+//                                String IRLeft = separatedReadings[0];
+//                                String US = separatedReadings[1];
+//                                String IRRight = separatedReadings[2];
+//                                uploadData(IRLeft,US,IRRight);
+//                            }
+//
+//                        } else {
+//                            // partial reading
+//                            partialReading = recDataString.substring(hashIndex + 1, recDataString.length());
+//                            hashIndex = -1;
+//
+//                        }
+//                    }
+                }
             }
-            };
-
+        };
 
 
         //TODO delete redundant handler after identification
@@ -164,8 +204,8 @@ public class MainActivity extends AppCompatActivity {
                 // obtain the HC-06 device if it is present
                 if (pairedDevices.size() > 0) {
                     for (BluetoothDevice device : pairedDevices) {
-                        if(device.getName().equals("HC-06"))
-                        mDevice = device;
+                        if (device.getName().equals("HC-06"))
+                            mDevice = device;
                         break;
                     }
                 }
@@ -177,6 +217,9 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
     }
 
     // button onClick methods
@@ -219,11 +262,51 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void closeBluetoothConnection(View view) {
-        if(connectThread != null) {
+        if (connectThread != null) {
             connectThread.cancel();
             Log.i("Bluetooth", "bluetooth connection closed successfully");
         }
 
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        client.connect();
+        Action viewAction = Action.newAction(
+                Action.TYPE_VIEW, // TODO: choose an action type.
+                "Main Page", // TODO: Define a title for the content shown.
+                // TODO: If you have web page content that matches this app activity's content,
+                // make sure this auto-generated web page URL is correct.
+                // Otherwise, set the URL to null.
+                Uri.parse("http://host/path"),
+                // TODO: Make sure this auto-generated app URL is correct.
+                Uri.parse("android-app://com.adityapradhan.bluetoothtutorialspoint/http/host/path")
+        );
+        AppIndex.AppIndexApi.start(client, viewAction);
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        Action viewAction = Action.newAction(
+                Action.TYPE_VIEW, // TODO: choose an action type.
+                "Main Page", // TODO: Define a title for the content shown.
+                // TODO: If you have web page content that matches this app activity's content,
+                // make sure this auto-generated web page URL is correct.
+                // Otherwise, set the URL to null.
+                Uri.parse("http://host/path"),
+                // TODO: Make sure this auto-generated app URL is correct.
+                Uri.parse("android-app://com.adityapradhan.bluetoothtutorialspoint/http/host/path")
+        );
+        AppIndex.AppIndexApi.end(client, viewAction);
+        client.disconnect();
     }
 
     // interface with bluetooth module
@@ -329,14 +412,16 @@ public class MainActivity extends AppCompatActivity {
             // Keep looping to listen for received messages
             while (true) {
                 try {
-                    bytes = mmInStream.read(buffer);            //read bytes from input buffer
-                    // print out array
+                    // read in bytes from Input Stream into buffer and store number of bytes retrieved
+                    bytes = mmInStream.read(buffer);
+                    // print out number of bytes in buffer
                     int bufferSize = 0;
-                    for(byte x : buffer) {
-                        if(x > 0) {
+                    for (byte x : buffer) {
+                        if (x > 0) {
                             bufferSize++;
                         }
                     }
+
                     Log.i("Buffer size", Integer.toString(bufferSize));
                     String readMessage = new String(buffer, 0, bytes);
                     // Send the obtained bytes to the UI Activity via handler
@@ -345,10 +430,6 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 }
             }
-
-            // write method to loop through bytes array and check if the value is == null
-            // if a value is equal to null return false - buffer is not full yet
-            // if a value is not equal to null return true - buffer is full -> clear buffer by looping through and
 
 
             // Keep listening to the InputStream until an exception occurs
@@ -388,6 +469,7 @@ public class MainActivity extends AppCompatActivity {
 
         /* Call this from the main activity to send data to the remote device */
         }
+
         public void write(byte[] bytes) {
             try {
                 mmOutStream.write(bytes);
@@ -402,6 +484,44 @@ public class MainActivity extends AppCompatActivity {
             } catch (IOException e) {
             }
         }
+
+
+
+
+
+    }
+    public void uploadData(String IRLeft, String US, String IRRight) {
+
+
+
+
+        WifiManager wifiMgr = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+        if (wifiMgr.isWifiEnabled()) {
+            // WiFi adapter is ON
+            WifiInfo wifiInfo = wifiMgr.getConnectionInfo();
+            if (wifiInfo.getNetworkId() == -1) {
+                // Not connected to an access-Point
+                Log.i("Readings Upload", "Wifi not connected. Readings were not sent");
+
+            }
+            // Connected to an Access Point
+            LightHouseAPI lighthouse = new LightHouseAPI();
+            HashMap<String, String> readings = new HashMap<String, String>();
+            readings.put("IRLeft", IRLeft);
+            readings.put("Ultrasound", US);
+            readings.put("IRRight", IRRight);
+
+            // Send readings to UDP port on server
+            boolean response = lighthouse.sendSensorDataSync(readings);
+            Log.i("Data Sync Response", Boolean.toString(response));
+
+        } else {
+            // WiFi adapter is OFF
+            Log.i("Readings Upload", "Wifi is not turned on. Readings were not sent");
+        }
+
+
+
 
     }
 
