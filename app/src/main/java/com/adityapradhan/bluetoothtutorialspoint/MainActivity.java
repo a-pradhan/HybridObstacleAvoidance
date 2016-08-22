@@ -26,6 +26,10 @@ import com.google.android.gms.appindexing.Action;
 import com.google.android.gms.appindexing.AppIndex;
 import com.google.android.gms.common.api.GoogleApiClient;
 
+import org.apache.commons.math3.linear.ArrayRealVector;
+import org.apache.commons.math3.linear.NonSymmetricMatrixException;
+import org.apache.commons.math3.linear.RealVector;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -47,6 +51,8 @@ public class MainActivity extends AppCompatActivity {
     ConnectThread connectThread;
     Handler bluetoothIn;
     final int handlerState = 0;
+    private ObstacleKalmanFilter filter;
+    int counter;
 
     private StringBuilder recDataString = new StringBuilder();
     /**
@@ -72,13 +78,64 @@ public class MainActivity extends AppCompatActivity {
                 if (msg.what == handlerState) {
                     // String obtained by reading from byte buffer
                     String readMessage = (String) msg.obj;
-                    //Log.i("parsed reading" , readMessage);
                     String readingString = readingParser.parseReadings(readMessage);
 
-                    if (readingString != null) {
-                        receivedDataTextView.setText(readingString);
+
+
+                    if (readingString != null) { // full set of readings received
                         Log.i("parsed reading" , readingString);
+                        Log.i("count", Integer.toString(counter++));
+                        receivedDataTextView.setText(readingString);
+                        // separate readings and arrange in a measurement vector
+                        String[] splitStringReadings = readingString.split(",");
+                        ArrayList<Double> splitDoubleReadings = new ArrayList<Double>(splitStringReadings.length + 1);
+
+                        for(int i=0;i < splitStringReadings.length; i++) {
+                            splitDoubleReadings.add(Double.parseDouble(splitStringReadings[i]));
+                        }
+
+                        if(filter == null) {
+                            // initialize filter with first set of readings making up part of the state with assumed 0 velocity
+                            splitDoubleReadings.add(0d);
+                            Double[] stateArray = splitDoubleReadings.toArray(new Double[splitDoubleReadings.size()]);
+
+                            RealVector initialState = new ArrayRealVector(stateArray);
+
+                            filter = new ObstacleKalmanFilter(initialState);
+
+                        } else {
+                            RealVector measurements = new ArrayRealVector(splitDoubleReadings.toArray(new Double[splitDoubleReadings.size()]));
+                            filter.predict();
+                            Log.i("filter prediction", filter.getStateEstimationVector().toString());
+                            try {
+                                filter.correct(measurements);
+                                Log.i("state estimate", filter.getStateEstimationVector().toString());
+                                Log.i("state covariance", filter.getStateCovarianceMatrix().toString());
+                            } catch (NonSymmetricMatrixException e) {
+                                Log.i("error", "filter is non-symmetric");
+                            }
+
+
+
+
+                        }
+
+
+
+
+
+
+
+
+
+
+
+                        // check if slowed/accelerating/user turned and reinitialize Filter object with latest estimate and current covariance matrix;
+
+
+
                     }
+
 
 
  //                   int endOfLineIndex = recDataString.indexOf("\n");
