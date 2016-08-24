@@ -12,6 +12,7 @@ import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Handler;
 import android.os.Message;
+import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -102,18 +103,21 @@ public class MainActivity extends AppCompatActivity {
                             RealVector initialState = new ArrayRealVector(stateArray);
 
                             filter = new ObstacleKalmanFilter(initialState);
+                            Log.i("initialState used", initialState.toString());
+                            Log.i("initial covariance", filter.getStateCovarianceMatrix().toString());
 
                         } else {
                             RealVector measurements = new ArrayRealVector(splitDoubleReadings.toArray(new Double[splitDoubleReadings.size()]));
                             filter.predict();
                             Log.i("filter prediction", filter.getStateEstimationVector().toString());
-                            try {
+                            //try {
                                 filter.correct(measurements);
                                 Log.i("state estimate", filter.getStateEstimationVector().toString());
                                 Log.i("state covariance", filter.getStateCovarianceMatrix().toString());
-                            } catch (NonSymmetricMatrixException e) {
-                                Log.i("error", "filter is non-symmetric");
-                            }
+
+//                            } catch (NonSymmetricMatrixException e) {
+//                                Log.i("error", "filter is non-symmetric");
+//                            }
 
 
 
@@ -550,8 +554,6 @@ public class MainActivity extends AppCompatActivity {
     public void uploadData(String IRLeft, String US, String IRRight) {
 
 
-
-
         WifiManager wifiMgr = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         if (wifiMgr.isWifiEnabled()) {
             // WiFi adapter is ON
@@ -560,21 +562,36 @@ public class MainActivity extends AppCompatActivity {
                 // Not connected to an access-Point
                 Log.i("Readings Upload", "Wifi not connected. Readings were not sent");
 
-            }
-            // Connected to an Access Point
-            LightHouseAPI lighthouse = new LightHouseAPI();
-            HashMap<String, String> readings = new HashMap<String, String>();
-            readings.put("IRLeft", IRLeft);
-            readings.put("Ultrasound", US);
-            readings.put("IRRight", IRRight);
+            } else {
+                // Connected to an Access Point
+                LightHouseAPI lighthouse = new LightHouseAPI();
+                HashMap<String, String> readings = new HashMap<String, String>();
+                // ID
+                String deviceID = Settings.Secure.ANDROID_ID;
+                readings.put("ID", deviceID);
 
-            // Send readings to UDP port on server
-            boolean response = lighthouse.sendSensorDataSync(readings);
-            Log.i("Data Sync Response", Boolean.toString(response));
+
+                // Timestamp
+                long timestamp = System.currentTimeMillis();
+                readings.put("Timestamp", Long.toString(timestamp));
+
+                // sensor_type
+
+                // Distance
+                readings.put("IRLeft", IRLeft);
+                readings.put("Distance", IRLeft);
+                readings.put("Ultrasound", US);
+                readings.put("IRRight", IRRight);
+
+
+                // Send readings to UDP port on server
+                boolean response = lighthouse.sendSensorDataSync(readings);
+                Log.i("Data Sync Response", Boolean.toString(response));
+            }
 
         } else {
             // WiFi adapter is OFF
-            Log.i("Readings Upload", "Wifi is not turned on. Readings were not sent");
+            Log.i("Data Upload", "Wifi is not turned on. Readings were not sent");
         }
 
 

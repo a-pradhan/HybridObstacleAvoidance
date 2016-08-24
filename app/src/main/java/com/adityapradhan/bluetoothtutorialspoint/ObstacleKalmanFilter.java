@@ -38,7 +38,7 @@ public class ObstacleKalmanFilter  {
     // TODO Extra add constructor that allows user to set all of the matrices if they desire
     // TODO Add constructur parameters to be used for X0, Z0;
     public ObstacleKalmanFilter() {
-        final double dt = 0.2; // time delta
+        final double dt = 0.2; // time delta in seconds
         final double velocity = 1; // TODO hard-coded for dev purposes use dynamic velocity later
 
 
@@ -71,10 +71,10 @@ public class ObstacleKalmanFilter  {
         // process noise covariance matrix
         RealMatrix Q = new Array2DRowRealMatrix(
                 new double[][] {
-                        { 100, 0, 0, 0 },
-                        { 0, 100, 0, 0 },
-                        { 0, 0, 100, 0 },
-                        { 0, 0, 0, 2.25 }
+                        { 0.1, 0, 0, 0 },
+                        { 0, 0.1, 0, 0 },
+                        { 0, 0, 0.1, 0 },
+                        { 0, 0, 0, 0 }
                 });
 
         // sensor error covariance matrix
@@ -164,17 +164,17 @@ public class ObstacleKalmanFilter  {
         // process noise covariance matrix
         RealMatrix Q = new Array2DRowRealMatrix(
                 new double[][] {
-                        { 100, 0, 0, 0 },
-                        { 0, 100, 0, 0 },
-                        { 0, 0, 100, 0 },
-                        { 0, 0, 0, 2.25 }
+                        { 0, 0, 0, 0 },
+                        { 0, 0, 0, 0 },
+                        { 0, 0, 0, 0 },
+                        { 0, 0, 0, 0 }
                 });
 
         // sensor error covariance matrix
         RealMatrix R = new Array2DRowRealMatrix(new double[][] {
-                { 20, 0, 0 },
-                { 0, 9, 0 },
-                { 0, 0, 20 }
+                { 100, 0, 0 },
+                { 0, 100, 0 },
+                { 0, 0, 100 }
 
         });
 
@@ -187,7 +187,7 @@ public class ObstacleKalmanFilter  {
                         { 20, 0, 0, 0 },
                         { 0, 9, 0, 0 },
                         { 0, 0, 20, 0 },
-                        { 0, 0, 0, 120 }
+                        { 0, 0, 0, 0 }
 
                 });
 
