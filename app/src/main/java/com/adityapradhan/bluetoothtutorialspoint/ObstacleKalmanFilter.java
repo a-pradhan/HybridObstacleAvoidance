@@ -223,6 +223,78 @@ public class ObstacleKalmanFilter  {
 
     }
 
+    public ObstacleKalmanFilter(RealVector initialState, RealMatrix initialCovariance) {
+        final double dt = 0.2; // time delta
+        final double velocity = 1; // TODO hard-coded for dev purposes use dynamic velocity later
+
+
+        // state transition matrix
+        RealMatrix A = new Array2DRowRealMatrix(
+                new double[][] {
+                        { 1, 0, 0, dt },
+                        { 0, 1, 0, dt },
+                        { 0, 0, 1, dt },
+                        { 0, 0, 0, 1  }
+
+                });
+
+        // no control input modelled
+        RealMatrix B = null;
+
+        // Measurement function matrix - used to convert state matrix into
+        // measurement space to calculate the residual
+        // measurement matrix vector fill we in the form:
+		/*
+		 * [1.23] [1] Z = [1.41] X = [2] [1.67] [3] [4]
+		 */
+        RealMatrix H = new Array2DRowRealMatrix(new double[][] {
+                { 1, 0, 0, 0 },
+                { 0, 1, 0, 0 },
+                { 0, 0, 1, 0 }
+
+        });
+
+        // process noise covariance matrix
+        RealMatrix Q = new Array2DRowRealMatrix(
+                new double[][] {
+                        { 0, 0, 0, 0 },
+                        { 0, 0, 0, 0 },
+                        { 0, 0, 0, 0 },
+                        { 0, 0, 0, 0 }
+                });
+
+        // sensor error covariance matrix
+        RealMatrix R = new Array2DRowRealMatrix(new double[][] {
+                { 100, 0, 0 },
+                { 0, 100, 0 },
+                { 0, 0, 100 }
+
+        });
+
+        // Initial state estimate
+        RealVector X0 = initialState;
+
+        // initial error covariance matrix
+        RealMatrix P0 = initialCovariance;
+
+        ProcessModel pm = new DefaultProcessModel(A, B, Q, X0, P0);
+        MeasurementModel mm = new DefaultMeasurementModel(H, R);
+        filter = new KalmanFilter(pm, mm);
+
+
+        System.out.println("Filter created successfully");
+
+        // mock measurements for x
+        double[] z = { 2.3, 2.9, 1.7 };
+
+        // mock measurement vector velocity is constant
+        RealVector Z =  new ArrayRealVector(z);
+        RealVector[] predictions = new RealVector[3];
+        RealVector[] estimates = new RealVector[3];
+
+
+    }
+
     public void predict() {
         filter.predict();
     }

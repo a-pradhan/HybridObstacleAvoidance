@@ -53,7 +53,8 @@
         android:id="@+id/listView"
         android:layout_centerHorizontal="true"
         android:layout_below="@+id/linearLayout"
-        android:layout_above="@+id/linerLayoutBottom" />
+        android:layout_above="@+id/linerLayoutBottom"
+        android:layout_marginBottom="180dp" />
 
 
 
@@ -84,12 +85,45 @@
             android:layout_alignEnd="@+id/listView"
             android:onClick="closeBluetoothConnection" />
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:id="@+id/receivedDataTextView"
-            android:autoText="false"
-            android:text="Count" />
-
     </LinearLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/sensorReadingsTitle"
+        android:text="Sensor Readings:"
+        android:layout_alignBottom="@+id/listView"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:textSize="20sp"
+        android:textColor="#000000" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/receivedDataTextView"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:text=""
+        android:textSize="20sp"
+        android:textColor="#000000"
+        android:layout_below="@+id/sensorReadingsTitle" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Filter Estimates:"
+        android:id="@+id/filterEstimateTitle"
+        android:textSize="20sp"
+        android:textColor="#000000"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:layout_below="@+id/receivedDataTextView" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/filterEstimateTextView"
+        android:text=""
+        android:layout_below="@+id/filterEstimateTitle" />
 </RelativeLayout>

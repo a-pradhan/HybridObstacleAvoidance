@@ -29,6 +29,7 @@ import com.google.android.gms.common.api.GoogleApiClient;
 
 import org.apache.commons.math3.linear.ArrayRealVector;
 import org.apache.commons.math3.linear.NonSymmetricMatrixException;
+import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.linear.RealVector;
 
 import java.io.IOException;
@@ -53,7 +54,8 @@ public class MainActivity extends AppCompatActivity {
     Handler bluetoothIn;
     final int handlerState = 0;
     private ObstacleKalmanFilter filter;
-    int counter;
+    private EventDetection eventDetection;
+    int counter; // to keep track of no. of iterations
 
     private StringBuilder recDataString = new StringBuilder();
     /**
@@ -70,6 +72,7 @@ public class MainActivity extends AppCompatActivity {
 
         Log.i("Info", "Start of Main Activity");
         final TextView receivedDataTextView = (TextView) findViewById(R.id.receivedDataTextView);
+        final TextView filterEstimateTextView = (TextView) findViewById(R.id.filterEstimateTextView);
         final ReadingParser readingParser = new ReadingParser();
 
         // initialize handler object to receive messages sent by bluetooth module
@@ -83,9 +86,9 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-                    if (readingString != null) { // full set of readings received
-                        Log.i("parsed reading" , readingString);
-                        Log.i("count", Integer.toString(counter++));
+                    if (readingString != null) { // full set of readings received -> initialize/run appropriate filter
+                       // Log.i("parsed reading" , readingString);
+                        //Log.i("count", Integer.toString(counter++));
                         receivedDataTextView.setText(readingString);
                         // separate readings and arrange in a measurement vector
                         String[] splitStringReadings = readingString.split(",");
@@ -105,19 +108,59 @@ public class MainActivity extends AppCompatActivity {
                             filter = new ObstacleKalmanFilter(initialState);
                             Log.i("initialState used", initialState.toString());
                             Log.i("initial covariance", filter.getStateCovarianceMatrix().toString());
-
+                            eventDetection = new EventDetection();
+                            eventDetection.addStateEstimate(initialState);
                         } else {
-                            RealVector measurements = new ArrayRealVector(splitDoubleReadings.toArray(new Double[splitDoubleReadings.size()]));
-                            filter.predict();
-                            Log.i("filter prediction", filter.getStateEstimationVector().toString());
-                            //try {
-                                filter.correct(measurements);
-                                Log.i("state estimate", filter.getStateEstimationVector().toString());
-                                Log.i("state covariance", filter.getStateCovarianceMatrix().toString());
+                            // check if moving or not
+                            RealVector[] previousEstimates = eventDetection.getStateEstimates();
+                            boolean[] distanceChangedArray = eventDetection.getChangedDistanceIndex(previousEstimates);
+                            boolean isMoved = false;
 
-//                            } catch (NonSymmetricMatrixException e) {
-//                                Log.i("error", "filter is non-symmetric");
-//                            }
+                            for(boolean changedDistance : distanceChangedArray) {
+                                if(changedDistance == true){
+                                    isMoved = true;
+                                    break;
+                                }
+                            }
+
+
+                            if(isMoved == true) {
+
+                                // if moving reinstantiate filter -  set initial velocity to 1 m/s and use current state estimate and covariance matrix
+                                Log.i("Movement", "movement detected reinitializing filter");
+                                RealVector initialState = filter.getStateEstimationVector();
+                                RealMatrix initialCovarianceMatrix = filter.getStateCovarianceMatrix();
+                                initialState.setEntry(3, 1.0); // set velocity to desired value
+                                filter = new ObstacleKalmanFilter(initialState, initialCovarianceMatrix);
+
+                            }
+                                counter++;
+                                // perform update
+                                RealVector measurements = new ArrayRealVector(splitDoubleReadings.toArray(new Double[splitDoubleReadings.size()]));
+                                filter.predict();
+                                //Log.i("filter prediction", filter.getStateEstimationVector().toString());
+
+                                filter.correct(measurements);
+                                filterEstimateTextView.setText(filter.getStateEstimationVector().toString());
+                                eventDetection.addStateEstimate(filter.getStateEstimationVector());
+                                if(counter % 5 == 0) {
+                                    Log.i("Filter Estimate", splitStringReadings.toString());
+                                }
+
+                                //Log.i("state estimate", filter.getStateEstimationVector().toString());
+                                //Log.i("state covariance", filter.getStateCovarianceMatrix().toString());
+
+
+                        }
+
+
+
+
+
+
+
+
+
 
 
 
@@ -216,7 +259,7 @@ public class MainActivity extends AppCompatActivity {
 //                        }
 //                    }
                 }
-            }
+
         };
 
 
@@ -483,7 +526,7 @@ public class MainActivity extends AppCompatActivity {
                         }
                     }
 
-                    Log.i("Buffer size", Integer.toString(bufferSize));
+                    //Log.i("Buffer size", Integer.toString(bufferSize));
                     String readMessage = new String(buffer, 0, bytes);
                     // Send the obtained bytes to the UI Activity via handler
                     bluetoothIn.obtainMessage(handlerState, bytes, -1, readMessage).sendToTarget();
@@ -596,6 +639,19 @@ public class MainActivity extends AppCompatActivity {
 
 
 
+
+    }
+
+    // assuming a constant velocity of the user.
+    // assume velocity is 1 metre a second
+    public boolean isMoving(double[] distances) {
+        for(int i=0; i< distances.length - 1; i++) {
+            if(distances[i+1] < distances[i] ) {
+                return false;
+            }
+        }
+
+        return true;
 
     }
 
