@@ -54,8 +54,7 @@ public class MainActivity extends AppCompatActivity {
     Handler bluetoothIn;
     final int handlerState = 0;
     private ObstacleKalmanFilter filter;
-    private EventDetection eventDetection;
-    int counter; // to keep track of no. of iterations
+    EventDetection eventDetection;
 
     private StringBuilder recDataString = new StringBuilder();
     /**
@@ -74,10 +73,14 @@ public class MainActivity extends AppCompatActivity {
         final TextView receivedDataTextView = (TextView) findViewById(R.id.receivedDataTextView);
         final TextView filterEstimateTextView = (TextView) findViewById(R.id.filterEstimateTextView);
         final ReadingParser readingParser = new ReadingParser();
+        eventDetection = new EventDetection();
+
 
         // initialize handler object to receive messages sent by bluetooth module
         //TODO create method for string processing
         bluetoothIn = new Handler() {
+
+
             public void handleMessage(Message msg) {
                 if (msg.what == handlerState) {
                     // String obtained by reading from byte buffer
@@ -85,200 +88,87 @@ public class MainActivity extends AppCompatActivity {
                     String readingString = readingParser.parseReadings(readMessage);
 
 
-
                     if (readingString != null) { // full set of readings received -> initialize/run appropriate filter
-                       // Log.i("parsed reading" , readingString);
+                        // Log.i("parsed reading" , readingString);
                         //Log.i("count", Integer.toString(counter++));
                         receivedDataTextView.setText(readingString);
                         // separate readings and arrange in a measurement vector
                         String[] splitStringReadings = readingString.split(",");
                         ArrayList<Double> splitDoubleReadings = new ArrayList<Double>(splitStringReadings.length + 1);
 
-                        for(int i=0;i < splitStringReadings.length; i++) {
+                        for (int i = 0; i < splitStringReadings.length; i++) {
                             splitDoubleReadings.add(Double.parseDouble(splitStringReadings[i]));
                         }
 
-                        if(filter == null) {
-                            // initialize filter with first set of readings making up part of the state with assumed 0 velocity
-                            splitDoubleReadings.add(0d);
-                            Double[] stateArray = splitDoubleReadings.toArray(new Double[splitDoubleReadings.size()]);
+                        RealVector measurements = new ArrayRealVector(splitDoubleReadings.toArray(new Double[splitDoubleReadings.size()]));
 
-                            RealVector initialState = new ArrayRealVector(stateArray);
+                        if (eventDetection.obstacleDetected(measurements)) {
+                                // instantiate correct filter
+                                filter = initFilter(filter, splitDoubleReadings);
 
-                            filter = new ObstacleKalmanFilter(initialState);
-                            Log.i("initialState used", initialState.toString());
-                            Log.i("initial covariance", filter.getStateCovarianceMatrix().toString());
-                            eventDetection = new EventDetection();
-                            eventDetection.addStateEstimate(initialState);
-                        } else {
-                            // check if moving or not
-                            RealVector[] previousEstimates = eventDetection.getStateEstimates();
-                            boolean[] distanceChangedArray = eventDetection.getChangedDistanceIndex(previousEstimates);
-                            boolean isMoved = false;
-
-                            for(boolean changedDistance : distanceChangedArray) {
-                                if(changedDistance == true){
-                                    isMoved = true;
-                                    break;
-                                }
-                            }
-
-
-                            if(isMoved == true) {
-
-                                // if moving reinstantiate filter -  set initial velocity to 1 m/s and use current state estimate and covariance matrix
-                                Log.i("Movement", "movement detected reinitializing filter");
-                                RealVector initialState = filter.getStateEstimationVector();
-                                RealMatrix initialCovarianceMatrix = filter.getStateCovarianceMatrix();
-                                initialState.setEntry(3, 1.0); // set velocity to desired value
-                                filter = new ObstacleKalmanFilter(initialState, initialCovarianceMatrix);
-
-                            }
-                                counter++;
-                                // perform update
-                                RealVector measurements = new ArrayRealVector(splitDoubleReadings.toArray(new Double[splitDoubleReadings.size()]));
+//                            if (filter == null) {
+//                                // initialize filter with first set of readings making up part of the state with assumed 0 velocity
+//                                splitDoubleReadings.add(0d);
+//                                Double[] stateArray = splitDoubleReadings.toArray(new Double[splitDoubleReadings.size()]);
+//
+//                                RealVector initialState = new ArrayRealVector(stateArray);
+//
+//                                filter = new ObstacleKalmanFilter(initialState);
+//                                Log.i("initialState used", initialState.toString());
+//                                Log.i("initial covariance", filter.getStateCovarianceMatrix().toString());
+//                                eventDetection = new EventDetection();
+//                                eventDetection.addStateEstimate(initialState);
+//                            } else {
+//                                // check if moving or not
+//                                RealVector[] previousEstimates = eventDetection.getStateEstimates();
+//                                boolean[] distanceChangedArray = eventDetection.getChangedDistanceIndex(previousEstimates);
+//
+//                                boolean isMoving = isMoving(distanceChangedArray);
+//                                filter = initMovingFilter(isMoving, filter); // instantiate new filter using if
+//
+//                                counter++;
+//
+//                                // run filter
+//                                filter.predict();
+//                                //Log.i("filter prediction", filter.getStateEstimationVector().toString());
+//                                filter.correct(measurements);
+//                                filterEstimateTextView.setText(filter.getStateEstimationVector().toString());
+//                                eventDetection.addStateEstimate(filter.getStateEstimationVector());
+//                                if (counter % 5 == 0) {
+//                                    Log.i("Filter Estimate", filter.getStateEstimationVector().toString());
+//                                }
+//
+//                                //Log.i("state estimate", filter.getStateEstimationVector().toString());
+//                                //Log.i("state covariance", filter.getStateCovarianceMatrix().toString());
+//
+//
+//                            }
                                 filter.predict();
-                                //Log.i("filter prediction", filter.getStateEstimationVector().toString());
-
                                 filter.correct(measurements);
-                                filterEstimateTextView.setText(filter.getStateEstimationVector().toString());
                                 eventDetection.addStateEstimate(filter.getStateEstimationVector());
-                                if(counter % 5 == 0) {
-                                    Log.i("Filter Estimate", splitStringReadings.toString());
-                                }
+                                filterEstimateTextView.setText(filter.getStateEstimationVector().toString());
+                                Log.i("state estimate", filter.getStateEstimationVector().toString());
+                                Log.i("state covariance", filter.getStateCovarianceMatrix().toString());
 
-                                //Log.i("state estimate", filter.getStateEstimationVector().toString());
-                                //Log.i("state covariance", filter.getStateCovarianceMatrix().toString());
-
-
+                        } else {
+                            Log.i("Reset Filter", "NO OBSTACLE DETECTED");
+                            filter = null;
                         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-                        }
-
-
-
-
-
-
-
-
-
-
-
-                        // check if slowed/accelerating/user turned and reinitialize Filter object with latest estimate and current covariance matrix;
-
 
 
                     }
 
 
+                    // check if slowed/accelerating/user turned and reinitialize Filter object with latest estimate and current covariance matrix;
 
- //                   int endOfLineIndex = recDataString.indexOf("\n");
-//
-//
-//                    if(endOfLineIndex > 0) {
-//                        String dataInPrint = recDataString.substring(0, endOfLineIndex);
-//                        //Log.i("Bluetooth", "Data Received via Bluetooth");
-//
-//                        //int dataLength = dataInPrint.length();
-//
-//                        if(recDataString.charAt(0) == '#') {
-//                            String readings = recDataString.substring(1, endOfLineIndex);
-//                            // TODO create textview to display the count
-//                            receivedDataTextView.setText(readings);
-//                            Log.i("Readings", readings);
-//                        }
-//                        recDataString.delete(0, recDataString.length());
-//                        dataInPrint = "";
-//
-//                    } else {
-//                        Log.i("Reading Parse Error", "end of Line index is not bigger than 0, could be null");
-//                    }
 
-//                    int hashIndex = recDataString.indexOf("#");
-//                    int newLineIndex = -1;
-//                    String partialReading = "";
-//
-//                    // beginning of a set of reading is found
-//                    while (hashIndex != -1) {
-//
-//                        newLineIndex = recDataString.indexOf("\n", newLineIndex + 1);
-//                        if (newLineIndex != -1) {
-//
-//                            if (newLineIndex > hashIndex) {
-//
-//                                String parsedReading = recDataString.substring(hashIndex + 1, newLineIndex);
-//                                // check if there is another hash in the String indicating another set of readings
-//                                hashIndex = recDataString.indexOf("#", hashIndex + 1);
-//
-//                                receivedDataTextView.setText(parsedReading);
-//                                Log.i("Readings", parsedReading);
-//                                // separate readings and send to server
-//                                // TODO refactor this code
-//                                String[] separatedReadings = parsedReading.split(",");
-//                                String IRLeft = separatedReadings[0];
-//                                String US = separatedReadings[1];
-//                                String IRRight = separatedReadings[2];
-//                                uploadData(IRLeft,US,IRRight);
-//
-//
-//
-//
-//                            } else {
-//                                // partial reading from previous set combined with remainder of reading set in
-//                                // subsequent iteration of loop
-//                                String endOfReading = recDataString.substring(0, newLineIndex);
-//                                String parsedReading = partialReading + endOfReading;
-//                                newLineIndex = newLineIndex + 1;
-//                                receivedDataTextView.setText(parsedReading);
-//                                Log.i("Readings", parsedReading);
-//                                String[] separatedReadings = parsedReading.split(",");
-//                                String IRLeft = separatedReadings[0];
-//                                String US = separatedReadings[1];
-//                                String IRRight = separatedReadings[2];
-//                                uploadData(IRLeft,US,IRRight);
-//                            }
-//
-//                        } else {
-//                            // partial reading
-//                            partialReading = recDataString.substring(hashIndex + 1, recDataString.length());
-//                            hashIndex = -1;
-//
-//                        }
-//                    }
                 }
+
+
+            }
 
         };
 
-
-        //TODO delete redundant handler after identification
-//        Handler mHandler = new Handler() {
-//            @Override
-//            public void handleMessage(Message msg) {
-//                byte[] writeBuf = (byte[]) msg.obj;
-//                int begin = (int) msg.arg1;
-//                int end = (int) msg.arg2;
-//
-//                switch (msg.what) {
-//                    case 1:
-//                        String writeMessage = new String(writeBuf);
-//                        writeMessage = writeMessage.substring(begin, end);
-//                        break;
-//                }
-//            }
-//        };
 
         // initialize button objects
         turnBtOnButton = (Button) findViewById(R.id.btnTurnBluetoothOn);
@@ -590,10 +480,8 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-
-
-
     }
+
     public void uploadData(String IRLeft, String US, String IRRight) {
 
 
@@ -638,21 +526,73 @@ public class MainActivity extends AppCompatActivity {
         }
 
 
-
-
     }
 
-    // assuming a constant velocity of the user.
-    // assume velocity is 1 metre a second
-    public boolean isMoving(double[] distances) {
-        for(int i=0; i< distances.length - 1; i++) {
-            if(distances[i+1] < distances[i] ) {
-                return false;
+
+    // assess whether user is moving by checking changedDistancesArray
+    public boolean isMoving(boolean[] distanceChangedArray) {
+        for (boolean changedDistance : distanceChangedArray) {
+            if (changedDistance == true) {
+                return true;
             }
         }
 
-        return true;
+        return false;
+
+    }
+    public ObstacleKalmanFilter initStationaryFilter(ArrayList<Double> splitDoubleReadings) {
+        // initial sensor readings used to provide initial state for model
+        splitDoubleReadings.add(0d); // velocity set to 0
+        Double[] stateArray = splitDoubleReadings.toArray(new Double[splitDoubleReadings.size()]);
+        RealVector initialState = new ArrayRealVector(stateArray); // state vector
+
+        filter = new ObstacleKalmanFilter(initialState);
+        Log.i("initialState used", initialState.toString());
+        Log.i("initial covariance", filter.getStateCovarianceMatrix().toString());
+
+        eventDetection.addStateEstimate(initialState);
+
+        return filter;
 
     }
 
-}
+    // returns adjusted filter if user is moving
+    public ObstacleKalmanFilter initMovingFilter(boolean isMoved, ObstacleKalmanFilter filter) {
+        if(isMoved == true) {
+            // if moving reinstantiate filter -  set initial velocity to 1 m/s and use current state estimate and covariance matrix
+            Log.i("Movement", "movement detected reinitializing filter");
+            RealVector initialState = filter.getStateEstimationVector();
+            RealMatrix initialCovarianceMatrix = filter.getStateCovarianceMatrix();
+            initialState.setEntry(3, -1.0); // set velocity to desired value
+            filter = new ObstacleKalmanFilter(initialState, initialCovarianceMatrix);
+        }
+        return filter;
+    }
+
+    public  ObstacleKalmanFilter initFilter(ObstacleKalmanFilter filter,ArrayList<Double> splitDoubleReadings) {
+        if (filter == null) {
+            // initialize filter for first time
+            filter = initStationaryFilter(splitDoubleReadings);
+
+        } else {
+
+            // initialize filter for person on the move
+            RealVector[] previousEstimates = eventDetection.getStateEstimates();
+            boolean[] distanceChangedArray = eventDetection.getChangedDistanceIndex(previousEstimates);
+            boolean isMoving = isMoving(distanceChangedArray);
+            filter = initMovingFilter(isMoving, filter); // instantiate new filter if moving other use existing
+
+        }
+
+        return filter;
+    }
+
+
+
+
+
+
+
+
+
+} // end of class

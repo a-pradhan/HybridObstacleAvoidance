@@ -4,7 +4,8 @@ import org.apache.commons.math3.linear.ArrayRealVector;
 import org.apache.commons.math3.linear.RealVector;
 
 /**
- * Created by Aditya on 8/26/2016. EventDetection currently helps to identify whether the user is stationary or moving
+ * Created by Aditya on 8/26/2016. EventDetection stores estimates produced by the Kalman Filters and attempts to
+ * gauge whether the user is stationary or moving/
  */
 public class EventDetection {
     private RealVector[] stateEstimates;
@@ -31,8 +32,6 @@ public class EventDetection {
             stateEstimates[i] = stateEstimates[i+1];
         }
     }
-
-
 
 
 
@@ -63,8 +62,15 @@ public class EventDetection {
         }
 
     // TODO implement method
-    static boolean obstacleDetected() {
+    static boolean obstacleDetected(RealVector measurementVector) {
+        for(int i=0; i < measurementVector.getDimension(); i++) {
+            if(measurementVector.getEntry(i)>=20 || measurementVector.getEntry(i) <= 150) {
+                return true;
+            }
+        }
+        // return false if no distance measurement is between 20,150;
         return false;
+
     }
 
     // TODO implement method
@@ -74,13 +80,16 @@ public class EventDetection {
 
 
     // Getter and Setters
-
     public RealVector[] getStateEstimates() {
         return stateEstimates;
     }
 
     public int getIndex() {
         return index;
+    }
+
+    public void clearEstimates() {
+        stateEstimates = new RealVector[5];
     }
 
 
