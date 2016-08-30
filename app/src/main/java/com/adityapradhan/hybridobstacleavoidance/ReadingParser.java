@@ -1,4 +1,4 @@
-package com.adityapradhan.bluetoothtutorialspoint;
+package com.adityapradhan.hybridobstacleavoidance;
 
 public class ReadingParser {
     private int startIndex, endIndex;

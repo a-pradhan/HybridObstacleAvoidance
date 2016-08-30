@@ -1,7 +1,7 @@
-package com.adityapradhan.bluetoothtutorialspoint;
+package com.adityapradhan.hybridobstacleavoidance;
 
 import org.junit.Test;
-import java.util.regex.Pattern;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 

@@ -1,4 +1,4 @@
-package com.adityapradhan.bluetoothtutorialspoint;
+package com.adityapradhan.hybridobstacleavoidance;
 
 import android.app.Application;
 import android.test.ApplicationTestCase;

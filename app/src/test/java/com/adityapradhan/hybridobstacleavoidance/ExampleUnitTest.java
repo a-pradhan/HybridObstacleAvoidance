@@ -1,4 +1,4 @@
-package com.adityapradhan.bluetoothtutorialspoint;
+package com.adityapradhan.hybridobstacleavoidance;
 
 import org.junit.Test;
 

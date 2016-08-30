@@ -1,12 +1,10 @@
-package com.adityapradhan.bluetoothtutorialspoint;
+package com.adityapradhan.hybridobstacleavoidance;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.content.Context;
 import android.content.Intent;
-import android.net.ConnectivityManager;
-import android.net.NetworkInfo;
 import android.net.Uri;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
@@ -28,7 +26,6 @@ import com.google.android.gms.appindexing.AppIndex;
 import com.google.android.gms.common.api.GoogleApiClient;
 
 import org.apache.commons.math3.linear.ArrayRealVector;
-import org.apache.commons.math3.linear.NonSymmetricMatrixException;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.linear.RealVector;
 
@@ -67,7 +64,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(com.adityapradhan.hybridobstacleavoidance.R.layout.activity_main);
 
         Log.i("Info", "Start of Main Activity");
         final TextView receivedDataTextView = (TextView) findViewById(R.id.receivedDataTextView);
@@ -563,7 +560,7 @@ public class MainActivity extends AppCompatActivity {
             Log.i("Movement", "movement detected reinitializing filter");
             RealVector initialState = filter.getStateEstimationVector();
             RealMatrix initialCovarianceMatrix = filter.getStateCovarianceMatrix();
-            initialState.setEntry(3, -1.0); // set velocity to desired value
+            initialState.setEntry(3, 0.0); // set velocity to desired value
             filter = new ObstacleKalmanFilter(initialState, initialCovarianceMatrix);
         }
         return filter;
