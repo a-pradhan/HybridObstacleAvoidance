@@ -27,12 +27,12 @@ public class MovementDetection {
             float speed = Math.abs(x + y + z - last_x - last_y - last_z)/ diffTime * 1000;
 
             if (speed > SHAKE_THRESHOLD) {
-                Log.i("Moving State", Boolean.toString(isMoving()));
+                //Log.i("Moving State", Boolean.toString(isMoving()));
                // Log.i("walking", Float.toString(speed));
                 storeAccelerometerChange(true);
 
             } else {
-                Log.i("Moving State", Boolean.toString(isMoving()));
+                //Log.i("Moving State", Boolean.toString(isMoving()));
                // Log.i("stationary", Float.toString(speed));
                 storeAccelerometerChange(false);
         }

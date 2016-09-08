@@ -71,17 +71,21 @@ public class ObstacleKalmanFilter  {
         // process noise covariance matrix
         RealMatrix Q = new Array2DRowRealMatrix(
                 new double[][] {
-                        { 0.1, 0, 0, 0 },
-                        { 0, 0.1, 0, 0 },
-                        { 0, 0, 0.1, 0 },
-                        { 0, 0, 0, 0 }
+//                        { 0.1, 0, 0, 0 },
+//                        { 0, 0.1, 0, 0 },
+//                        { 0, 0, 0.1, 0 },
+//                        { 0, 0, 0, 0 }
+                        { Math.pow(dt,3)/3, 0, 0, 0 },
+                        { 0, Math.pow(dt,3)/3, 0, 0 },
+                        { 0, 0, Math.pow(dt,3)/3, 0 },
+                        { 0, 0, 0, dt               }
                 });
 
         // sensor error covariance matrix
         RealMatrix R = new Array2DRowRealMatrix(new double[][] {
-                { 20, 0, 0 },
-                { 0, 9, 0 },
-                { 0, 0, 20 }
+                { 47, 0, 0 },
+                { 0, 100, 0 },
+                { 0, 0, 96 }
 
         });
 
@@ -164,17 +168,22 @@ public class ObstacleKalmanFilter  {
         // process noise covariance matrix
         RealMatrix Q = new Array2DRowRealMatrix(
                 new double[][] {
-                        { 0, 0, 0, 0 },
-                        { 0, 0, 0, 0 },
-                        { 0, 0, 0, 0 },
-                        { 0, 0, 0, 0 }
+//                        { 0, 0, 0, 0 },
+//                        { 0, 0, 0, 0 },
+//                        { 0, 0, 0, 0 },
+//                        { 0, 0, 0, 0 }
+
+                        { Math.pow(dt,3)/3, 0, 0, 0 },
+                        { 0, Math.pow(dt,3)/3, 0, 0 },
+                        { 0, 0, Math.pow(dt,3)/3, 0 },
+                        { 0, 0, 0, 0              }
                 });
 
         // sensor error covariance matrix
         RealMatrix R = new Array2DRowRealMatrix(new double[][] {
-                { 100, 0, 0 },
+                { 47, 0, 0 },
                 { 0, 100, 0 },
-                { 0, 0, 100 }
+                { 0, 0, 96 }
 
         });
 
@@ -184,9 +193,9 @@ public class ObstacleKalmanFilter  {
         // initial error covariance matrix
         RealMatrix P0 = new Array2DRowRealMatrix(
                 new double[][] {
-                        { 20, 0, 0, 0 },
-                        { 0, 9, 0, 0 },
-                        { 0, 0, 20, 0 },
+                        { 47, 0, 0, 0 },
+                        { 0, 100, 0, 0 },
+                        { 0, 0, 96, 0 },
                         { 0, 0, 0, 0 }
 
                 });
@@ -257,17 +266,17 @@ public class ObstacleKalmanFilter  {
         // process noise covariance matrix
         RealMatrix Q = new Array2DRowRealMatrix(
                 new double[][] {
-                        { 0, 0, 0, 0 },
-                        { 0, 0, 0, 0 },
-                        { 0, 0, 0, 0 },
-                        { 0, 0, 0, 0 }
+                        { Math.pow(dt,3)/3, 0, 0, 0 },
+                        { 0, Math.pow(dt,3)/3, 0, 0 },
+                        { 0, 0, Math.pow(dt,3)/3, 0 },
+                        { 0, 0, 0, 0               }
                 });
 
         // sensor error covariance matrix
         RealMatrix R = new Array2DRowRealMatrix(new double[][] {
-                { 100, 0, 0 },
+                { 47, 0, 0 },
                 { 0, 100, 0 },
-                { 0, 0, 100 }
+                { 0, 0, 96 }
 
         });
 

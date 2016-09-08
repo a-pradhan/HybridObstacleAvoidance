@@ -113,7 +113,7 @@ public class MainActivity extends AppCompatActivity {
 
 
         // initialize handler object to receive messages sent by bluetooth module
-        //TODO create method for string processing
+        //TODO create new Handler class for this method
         bluetoothIn = new Handler() {
 
 
@@ -124,13 +124,14 @@ public class MainActivity extends AppCompatActivity {
                     String readingString = readingParser.parseReadings(readMessage);
 
 
-                    if (readingString != null) { // full set of readings received -> initialize/run appropriate filter
+                    if (readingString != null) {
+                        // full set of readings received -> initialize/run appropriate filter
                         // Log.i("parsed reading" , readingString);
                         //Log.i("count", Integer.toString(counter++));
                         receivedDataTextView.setText(readingString);
                         // separate readings and arrange in a measurement vector
                         String[] splitStringReadings = readingString.split(",");
-                        ArrayList<Double> splitDoubleReadings = new ArrayList<Double>(splitStringReadings.length + 1);
+                        ArrayList<Double> splitDoubleReadings = new ArrayList<Double>(splitStringReadings.length + 1); // extra to hold velocity, which is not measured
 
                         for (int i = 0; i < splitStringReadings.length; i++) {
                             splitDoubleReadings.add(Double.parseDouble(splitStringReadings[i]));
@@ -138,7 +139,7 @@ public class MainActivity extends AppCompatActivity {
 
                         RealVector measurements = new ArrayRealVector(splitDoubleReadings.toArray(new Double[splitDoubleReadings.size()]));
 
-                        if (eventDetection.obstacleDetected(measurements)) {
+                        if (obstacleDetected(measurements)) {
                                 // instantiate correct filter
                                 filter = initFilter(filter, splitDoubleReadings);
 
@@ -181,10 +182,18 @@ public class MainActivity extends AppCompatActivity {
 //                            }
                                 filter.predict();
                                 filter.correct(measurements);
-                                eventDetection.addStateEstimate(filter.getStateEstimationVector());
-                                filterEstimateTextView.setText(filter.getStateEstimationVector().toString());
+                                RealVector stateEstimate = filter.getStateEstimationVector();
+                                // eventDetection.addStateEstimate(filter.getStateEstimationVector());
+                                filterEstimateTextView.setText(stateEstimate.toString());
                                 //Log.i("state estimate", filter.getStateEstimationVector().toString());
                                 //Log.i("state covariance", filter.getStateCovarianceMatrix().toString());
+
+                            // reset filter if values are negative
+                            if(areEstimatesNegative(stateEstimate)) {
+                                Log.i("Rest Filter", "STATE ESTIMATE IS NEGATIVE");
+                                filter = null;
+                            }
+
 
                         } else {
                             Log.i("Reset Filter", "NO OBSTACLE DETECTED");
@@ -374,6 +383,7 @@ public class MainActivity extends AppCompatActivity {
             BluetoothSocket tmp = null;
             mmDevice = device;
             // get connected bluetooth devices UUID
+            // TODO handle null pointer exception when attempting to obtain UUID while BT is off
             MY_UUID = mmDevice.getUuids()[0].getUuid();
             //"00001101-0000-1000-8000-00805f9b34fb"
 
@@ -618,10 +628,10 @@ public class MainActivity extends AppCompatActivity {
     public ObstacleKalmanFilter initMovingFilter(boolean isMoved, ObstacleKalmanFilter filter) {
         if(isMoved == true) {
             // if moving reinstantiate filter -  set initial velocity to 1 m/s and use current state estimate and covariance matrix
-            Log.i("Movement", "movement detected reinitializing filter");
+            Log.i("Movement detected", "Initializing moving filter");
             RealVector initialState = filter.getStateEstimationVector();
             RealMatrix initialCovarianceMatrix = filter.getStateCovarianceMatrix();
-            initialState.setEntry(3, -10); // set velocity to desired value - obtain dynamically in future
+            initialState.setEntry(3, -50); // set velocity to desired value - obtain dynamically in future
             filter = new ObstacleKalmanFilter(initialState, initialCovarianceMatrix);
         }
         return filter;
@@ -646,12 +656,32 @@ public class MainActivity extends AppCompatActivity {
         return filter;
     }
 
+    public boolean obstacleDetected(RealVector measurementVector) {
+        if(measurementVector.getEntry(0) < 160 || measurementVector.getEntry(1) < 140 || measurementVector.getEntry(2) < 160) {
+            return true;
+        }
+
+        return false;
+
+    }
+
+    // returns an array corrseponding to 3 sensors identifying which sensors have detected an obstacle and corresponds to each side
+    public boolean[] whichSide(RealVector estimateVector) {
+        boolean[] obstaclePresent = new boolean[3];
 
 
+        return obstaclePresent;
+    }
 
+    // returns true if any of the filter estimates are negative, signalling that the filter should be reset
+    // TODO use loop to avoid hard coding
+    public boolean areEstimatesNegative(RealVector estimateVector) {
+        if(estimateVector.getEntry(0) < 20 || estimateVector.getEntry(1) < 20 || estimateVector.getEntry(2) < 20) {
+            return true;
+        }
 
-
-
+        return false;
+    }
 
 
 } // end of class
