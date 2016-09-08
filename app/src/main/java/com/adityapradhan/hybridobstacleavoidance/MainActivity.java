@@ -5,10 +5,15 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.content.Context;
 import android.content.Intent;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.net.Uri;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.Message;
 import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
@@ -47,13 +52,26 @@ public class MainActivity extends AppCompatActivity {
     private BluetoothAdapter BA;
     private Set<BluetoothDevice> pairedDevices;
     BluetoothDevice mDevice;
+
     ConnectThread connectThread;
     Handler bluetoothIn;
     final int handlerState = 0;
-    private ObstacleKalmanFilter filter;
-    EventDetection eventDetection;
 
+
+    private SensorManager sensorManager;
+    private Sensor accelerometer;
+    private MovementDetection movementDetection = new MovementDetection(10);
+    private HandlerThread mSensorThread;
+    private Handler mSensorHandler;
+
+    EventDetection eventDetection;
+    private ObstacleKalmanFilter filter;
+
+//    private long lastUpdate = 0;
+//    private float last_x, last_y, last_z;
+//    private static final int SHAKE_THRESHOLD = 200;
     private StringBuilder recDataString = new StringBuilder();
+
     /**
      * ATTENTION: This was auto-generated to implement the App Indexing API.
      * See https://g.co/AppIndexing/AndroidStudio for more information.
@@ -64,13 +82,34 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(com.adityapradhan.hybridobstacleavoidance.R.layout.activity_main);
+        setContentView(R.layout.activity_main);
 
         Log.i("Info", "Start of Main Activity");
         final TextView receivedDataTextView = (TextView) findViewById(R.id.receivedDataTextView);
         final TextView filterEstimateTextView = (TextView) findViewById(R.id.filterEstimateTextView);
         final ReadingParser readingParser = new ReadingParser();
         eventDetection = new EventDetection();
+
+        // setup accelerometer
+        Log.i("Info", "setup sensor");
+        sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        accelerometer = null;
+        if (accelerometer == null) {
+            // Use the accelerometer.
+            if (sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null) {
+                accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+            } else {
+                // Sorry, there are no accelerometers on your device.
+                // You can't play this game.
+            }
+        }
+        Log.i("Info", "register sensor listener");
+
+        // http://stackoverflow.com/questions/3286815/sensoreventlistener-in-separate-thread
+        mSensorThread = new HandlerThread("Sensor thread", Thread.MAX_PRIORITY);
+        mSensorThread.start();
+        mSensorHandler = new Handler(mSensorThread.getLooper()); //Blocks until looper is prepared, which is fairly quick
+        sensorManager.registerListener(new AccelerometerListener(movementDetection), accelerometer, SensorManager.SENSOR_DELAY_NORMAL, mSensorHandler);
 
 
         // initialize handler object to receive messages sent by bluetooth module
@@ -144,8 +183,8 @@ public class MainActivity extends AppCompatActivity {
                                 filter.correct(measurements);
                                 eventDetection.addStateEstimate(filter.getStateEstimationVector());
                                 filterEstimateTextView.setText(filter.getStateEstimationVector().toString());
-                                Log.i("state estimate", filter.getStateEstimationVector().toString());
-                                Log.i("state covariance", filter.getStateCovarianceMatrix().toString());
+                                //Log.i("state estimate", filter.getStateEstimationVector().toString());
+                                //Log.i("state covariance", filter.getStateCovarianceMatrix().toString());
 
                         } else {
                             Log.i("Reset Filter", "NO OBSTACLE DETECTED");
@@ -299,6 +338,28 @@ public class MainActivity extends AppCompatActivity {
         AppIndex.AppIndexApi.end(client, viewAction);
         client.disconnect();
     }
+
+//    @Override
+//    public void onSensorChanged(SensorEvent sensorEvent) {
+//        Sensor mySensor = sensorEvent.sensor;
+//
+//
+//        if (mySensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+//            float x = sensorEvent.values[0];
+//            float y = sensorEvent.values[1];
+//            float z = sensorEvent.values[2];
+//            long currTime = System.currentTimeMillis();
+//
+//            movementDetection.recAccelerometerChange(x,y,z,currTime);
+//
+//        }
+//
+//    }
+//
+//    @Override
+//    public void onAccuracyChanged(Sensor sensor, int i) {
+//
+//    }
 
     // interface with bluetooth module
     private class ConnectThread extends Thread {
@@ -560,7 +621,7 @@ public class MainActivity extends AppCompatActivity {
             Log.i("Movement", "movement detected reinitializing filter");
             RealVector initialState = filter.getStateEstimationVector();
             RealMatrix initialCovarianceMatrix = filter.getStateCovarianceMatrix();
-            initialState.setEntry(3, 0.0); // set velocity to desired value
+            initialState.setEntry(3, -10); // set velocity to desired value - obtain dynamically in future
             filter = new ObstacleKalmanFilter(initialState, initialCovarianceMatrix);
         }
         return filter;
@@ -576,7 +637,8 @@ public class MainActivity extends AppCompatActivity {
             // initialize filter for person on the move
             RealVector[] previousEstimates = eventDetection.getStateEstimates();
             boolean[] distanceChangedArray = eventDetection.getChangedDistanceIndex(previousEstimates);
-            boolean isMoving = isMoving(distanceChangedArray);
+            //boolean isMoving = isMoving(distanceChangedArray);
+            boolean isMoving = movementDetection.isMoving();
             filter = initMovingFilter(isMoving, filter); // instantiate new filter if moving other use existing
 
         }
