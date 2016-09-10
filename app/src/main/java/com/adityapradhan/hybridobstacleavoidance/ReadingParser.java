@@ -27,31 +27,31 @@ public class ReadingParser {
                 return parsedReading;
 
             } else {
-                // endIndex smaller than startIndex
-                if (endIndex == -1) {
-                    // newline char not present in current string readings
-                    partialReading = readings.substring(startIndex + 1, readings.length());
-                    //readings.delete(startIndex,readings.length());
-                    return null;
-                } else {
-                    // newline char from previous set of readings at start of
-                    // StringBuilder
-                    String endOfReading = readings.substring(endIndex + 1, startIndex);
-                    parsedReading = partialReading + endOfReading;
-                    //readings.delete(endIndex,startIndex);
-                    return parsedReading;
-                }
+                return null;
+                // endIndex not present
+//                if (endIndex == -1) {
+//                    // newline char not present in current string readings
+//                    partialReading = readings.substring(startIndex + 1, readings.length());
+//                    //readings.delete(startIndex,readings.length());
+//                    return null;
+//                }
+                //else {
+//                    // newline char from previous set of readings at start of
+//                    // StringBuilder
+//                    String endOfReading = readings.substring(endIndex + 1, startIndex);
+//                    parsedReading = partialReading + endOfReading;
+//                    //readings.delete(endIndex,startIndex);
+//                    return parsedReading;
+//                }
 
             }
 
-        } else {
-
-            return null;
-
         }
+
+        return null;
     }
 
-    // Getter methods
+    // Getter methods for debugging
     public int getStartIndex() {
         return startIndex;
     }

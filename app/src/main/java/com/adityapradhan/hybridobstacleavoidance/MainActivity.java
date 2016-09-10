@@ -9,9 +9,11 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
@@ -29,15 +31,25 @@ import android.widget.Toast;
 import com.google.android.gms.appindexing.Action;
 import com.google.android.gms.appindexing.AppIndex;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.opencsv.CSVWriter;
 
 import org.apache.commons.math3.linear.ArrayRealVector;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.linear.RealVector;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Set;
 import java.util.UUID;
@@ -64,10 +76,12 @@ public class MainActivity extends AppCompatActivity {
     private HandlerThread mSensorThread;
     private Handler mSensorHandler;
 
+
     EventDetection eventDetection;
     private ObstacleKalmanFilter filter;
 
-//    private long lastUpdate = 0;
+
+    //    private long lastUpdate = 0;
 //    private float last_x, last_y, last_z;
 //    private static final int SHAKE_THRESHOLD = 200;
     private StringBuilder recDataString = new StringBuilder();
@@ -78,17 +92,23 @@ public class MainActivity extends AppCompatActivity {
      */
     private GoogleApiClient client;
 
+    String launchTimeStamp;
+
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+
+
 
         Log.i("Info", "Start of Main Activity");
         final TextView receivedDataTextView = (TextView) findViewById(R.id.receivedDataTextView);
         final TextView filterEstimateTextView = (TextView) findViewById(R.id.filterEstimateTextView);
         final ReadingParser readingParser = new ReadingParser();
         eventDetection = new EventDetection();
+        launchTimeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
 
         // setup accelerometer
         Log.i("Info", "setup sensor");
@@ -139,9 +159,10 @@ public class MainActivity extends AppCompatActivity {
 
                         RealVector measurements = new ArrayRealVector(splitDoubleReadings.toArray(new Double[splitDoubleReadings.size()]));
 
+
                         if (obstacleDetected(measurements)) {
-                                // instantiate correct filter
-                                filter = initFilter(filter, splitDoubleReadings);
+                            // instantiate correct filter
+                            filter = initFilter(filter, splitDoubleReadings);
 
 //                            if (filter == null) {
 //                                // initialize filter with first set of readings making up part of the state with assumed 0 velocity
@@ -180,16 +201,32 @@ public class MainActivity extends AppCompatActivity {
 //
 //
 //                            }
-                                filter.predict();
-                                filter.correct(measurements);
-                                RealVector stateEstimate = filter.getStateEstimationVector();
-                                // eventDetection.addStateEstimate(filter.getStateEstimationVector());
-                                filterEstimateTextView.setText(stateEstimate.toString());
-                                //Log.i("state estimate", filter.getStateEstimationVector().toString());
-                                //Log.i("state covariance", filter.getStateCovarianceMatrix().toString());
+                            filter.predict();
+                            filter.correct(measurements);
+                            RealVector stateEstimateVector = filter.getStateEstimationVector();
+                            String stateEstimate = "";
 
-                            // reset filter if values are negative
-                            if(areEstimatesNegative(stateEstimate)) {
+                            for(int i = 0; i < stateEstimateVector.getDimension(); i++) {
+                                if(i != stateEstimateVector.getDimension() - 1) {
+                                    stateEstimate += stateEstimateVector.getEntry(i) + ",";
+                                } else {
+                                    // do not add "," for last entry
+                                    stateEstimate += stateEstimateVector.getEntry(i) + "\n";
+                                }
+
+                            }
+                            // eventDetection.addStateEstimate(filter.getStateEstimationVector());
+                            filterEstimateTextView.setText(stateEstimate);
+                           // Log.i("state estimate", stateEstimate);
+
+                            //Log.i("state covariance", filter.getStateCovarianceMatrix().toString());
+                            // log readings to CSv file
+                            String logReadings = readingString + "," + stateEstimate;
+                            Log.i("log reading", logReadings);
+                            saveToCSV(launchTimeStamp, logReadings);
+
+                            // reset filter if estimates are negative (applies for moving case)
+                            if (areEstimatesNegative(stateEstimateVector)) {
                                 Log.i("Rest Filter", "STATE ESTIMATE IS NEGATIVE");
                                 filter = null;
                             }
@@ -248,6 +285,7 @@ public class MainActivity extends AppCompatActivity {
                         break;
                     }
                 }
+
 
                 // TODO make the connectThread variable a local variable, passed into the method rather than having
                 // it available throughout the class
@@ -400,7 +438,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         public void run() {
-            // Cancel discovery because it will slow down the connection
+            // Cancel discovery if its on because it will slow down the connection
             BA.cancelDiscovery();
 
             Log.i("bluetooth status", "start of connectThread");
@@ -455,6 +493,7 @@ public class MainActivity extends AppCompatActivity {
                 tmpIn = socket.getInputStream();
                 tmpOut = socket.getOutputStream();
             } catch (IOException e) {
+                e.printStackTrace();
             }
 
             mmInStream = tmpIn;
@@ -464,6 +503,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         public void run() {
+              // Resource: https://wingoodharry.wordpress.com/2014/04/15/android-sendreceive-data-with-arduino-using-bluetooth-part-2/
 //            byte[] buffer = new byte[1024];  // buffer store for the stream
 //            int begin = 0;
 //            int bytes;  // bytes returned from read()
@@ -476,15 +516,16 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     // read in bytes from Input Stream into buffer and store number of bytes retrieved
                     bytes = mmInStream.read(buffer);
-                    // print out number of bytes in buffer
-                    int bufferSize = 0;
-                    for (byte x : buffer) {
-                        if (x > 0) {
-                            bufferSize++;
-                        }
-                    }
 
+                    // print out number of bytes in buffer
+//                    int bufferSize = 0;
+//                    for (byte x : buffer) {
+//                        if (x > 0) {
+//                            bufferSize++;
+//                        }
+//                    }
                     //Log.i("Buffer size", Integer.toString(bufferSize));
+                    // TODO handle NullPointerException
                     String readMessage = new String(buffer, 0, bytes);
                     // Send the obtained bytes to the UI Activity via handler
                     bluetoothIn.obtainMessage(handlerState, bytes, -1, readMessage).sendToTarget();
@@ -608,6 +649,7 @@ public class MainActivity extends AppCompatActivity {
         return false;
 
     }
+
     public ObstacleKalmanFilter initStationaryFilter(ArrayList<Double> splitDoubleReadings) {
         // initial sensor readings used to provide initial state for model
         splitDoubleReadings.add(0d); // velocity set to 0
@@ -626,7 +668,7 @@ public class MainActivity extends AppCompatActivity {
 
     // returns adjusted filter if user is moving
     public ObstacleKalmanFilter initMovingFilter(boolean isMoved, ObstacleKalmanFilter filter) {
-        if(isMoved == true) {
+        if (isMoved == true) {
             // if moving reinstantiate filter -  set initial velocity to 1 m/s and use current state estimate and covariance matrix
             Log.i("Movement detected", "Initializing moving filter");
             RealVector initialState = filter.getStateEstimationVector();
@@ -637,7 +679,7 @@ public class MainActivity extends AppCompatActivity {
         return filter;
     }
 
-    public  ObstacleKalmanFilter initFilter(ObstacleKalmanFilter filter,ArrayList<Double> splitDoubleReadings) {
+    public ObstacleKalmanFilter initFilter(ObstacleKalmanFilter filter, ArrayList<Double> splitDoubleReadings) {
         if (filter == null) {
             // initialize filter for first time
             filter = initStationaryFilter(splitDoubleReadings);
@@ -657,7 +699,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public boolean obstacleDetected(RealVector measurementVector) {
-        if(measurementVector.getEntry(0) < 160 || measurementVector.getEntry(1) < 140 || measurementVector.getEntry(2) < 160) {
+        if (measurementVector.getEntry(0) < 160 || measurementVector.getEntry(1) < 140 || measurementVector.getEntry(2) < 160) {
             return true;
         }
 
@@ -676,12 +718,156 @@ public class MainActivity extends AppCompatActivity {
     // returns true if any of the filter estimates are negative, signalling that the filter should be reset
     // TODO use loop to avoid hard coding
     public boolean areEstimatesNegative(RealVector estimateVector) {
-        if(estimateVector.getEntry(0) < 20 || estimateVector.getEntry(1) < 20 || estimateVector.getEntry(2) < 20) {
+        if (estimateVector.getEntry(0) < 20 || estimateVector.getEntry(1) < 20 || estimateVector.getEntry(2) < 20) {
             return true;
         }
 
         return false;
     }
 
+    // saves sensor/filter data to a csv log file
+    public void saveToCSV() {
+//        String baseDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS).getAbsolutePath();
+//        String FILENAME = "sensor_data.csv";
+//        String filepath = baseDir + File.separator + FILENAME;
+//        String entry = "1,2,3\n";
+//        File f = new
 
+//        try {
+//            // write to end of file if it exists
+//            FileOutputStream out = openFileOutput(filepath, Context.MODE_APPEND);
+//            out.write(entry.getBytes());
+//            out.close();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+
+//        File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
+//        File file = new File(dir, "sensor_readings.csv");
+//
+//        try {
+//            FileWriter fileWriter = new FileWriter(file);
+//            fileWriter.append("1,2,3");
+//            fileWriter.flush();
+//            fileWriter.close();
+//
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
+
+//        String fileName = "example.csv";
+//        String dirName = "MyDirectory";
+//        String contentToWrite = "Your Content Goes Here";
+//        File myDir = new File("sdcard", dirName);
+//
+///*if directory doesn't exist, create it*/
+//        if(!myDir.exists())
+//            myDir.mkdirs();
+//
+//
+//        File myFile = new File(myDir, fileName);
+//
+///*Write to file*/
+//        try {
+//            FileWriter fileWriter = new FileWriter(myFile);
+//            fileWriter.append(contentToWrite);
+//            fileWriter.flush();
+//            fileWriter.close();
+//        }
+//        catch(IOException e){
+//            e.printStackTrace();
+//        }
+
+
+//        String data = "1,2,3";
+//        File baseDir = new File("/sdcard/Documents");
+//        String fileName = "test";
+//
+//        File file = new File(baseDir, fileName + ".csv");
+//        Log.i("Directory to Save", file.getAbsolutePath());
+//
+//        try {
+//            if (!file.exists()) {
+//                file.createNewFile();
+//            }
+//
+//            FileWriter fw = new FileWriter(file.getAbsolutePath());
+//            BufferedWriter bw = new BufferedWriter(fw);
+//            bw.write(data);
+//            bw.close();
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        } {
+//
+//        }
+
+
+
+
+    }
+
+public void saveToCSV(String timeStamp, String reading) {
+    // Resource: http://blog.cindypotvin.com/saving-data-to-a-file-in-your-android-application/
+    try
+    {
+        // Creates a trace file in the primary external storage space of the
+        // current application.
+        // If the file does not exists, it is created.
+        File csvFile = new File(((Context)this).getExternalFilesDir(null), "readings_" + timeStamp + ".csv");
+        if (!csvFile.exists())
+            csvFile.createNewFile();
+        // Adds a line to the trace file
+        BufferedWriter writer = new BufferedWriter(new FileWriter(csvFile, true /*append*/));
+        writer.write(reading);
+        writer.close();
+        // Refresh the data so it can seen when the device is plugged in a
+        // computer. You may have to unplug and replug the device to see the
+        // latest changes. This is not necessary if the user should not modify
+        // the files.
+        MediaScannerConnection.scanFile((Context)(this),
+                new String[] { csvFile.toString() },
+                null,
+                null);
+
+    }
+    catch (IOException e)
+    {
+        Log.e("file test", "Unable to write to the TraceFile.txt file.");
+    }
+}
+
+    public static boolean isSdReadable()
+    {
+
+        boolean mExternalStorageAvailable = false;
+        try
+        {
+            String state = Environment.getExternalStorageState();
+
+            if (Environment.MEDIA_MOUNTED.equals(state))
+            {
+                // We can read and write the media
+                mExternalStorageAvailable = true;
+                Log.i("isSdReadable", "External storage card is readable.");
+            }
+            else if (Environment.MEDIA_MOUNTED_READ_ONLY.equals(state))
+            {
+                // We can only read the media
+                Log.i("isSdReadable", "External storage card is readable.");
+                mExternalStorageAvailable = true;
+            }
+            else
+            {
+                // Something else is wrong. It may be one of many other
+                // states, but all we need to know is we can neither read nor
+                // write
+                mExternalStorageAvailable = false;
+                Log.i("isSdReadable", "Cannot read or write to storage");
+            }
+        } catch (Exception ex)
+        {
+
+        }
+        return mExternalStorageAvailable;
+    }
 } // end of class
