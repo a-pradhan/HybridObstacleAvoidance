@@ -17,6 +17,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -31,6 +32,7 @@ import android.widget.Toast;
 import com.google.android.gms.appindexing.Action;
 import com.google.android.gms.appindexing.AppIndex;
 import com.google.android.gms.common.api.GoogleApiClient;
+import com.jjoe64.graphview.GraphView;
 import com.opencsv.CSVWriter;
 
 import org.apache.commons.math3.linear.ArrayRealVector;
@@ -53,6 +55,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Set;
 import java.util.UUID;
+import java.util.logging.Filter;
 
 import ucl.LightHouse.LightHouseAPI;
 
@@ -75,6 +78,7 @@ public class MainActivity extends AppCompatActivity {
     private MovementDetection movementDetection = new MovementDetection(10);
     private HandlerThread mSensorThread;
     private Handler mSensorHandler;
+    private GraphView leftIRGraph, ultrasoundGraph, rightIRGraph;
 
 
     EventDetection eventDetection;
@@ -110,6 +114,13 @@ public class MainActivity extends AppCompatActivity {
         eventDetection = new EventDetection();
         launchTimeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
 
+        // initialize Graph Views
+        leftIRGraph = (GraphView) findViewById(R.id.graphLeftIR);
+        ultrasoundGraph = (GraphView) findViewById(R.id.graphUltrasound);
+        rightIRGraph = (GraphView) findViewById(R.id.graphRightIR);
+
+
+
         // setup accelerometer
         Log.i("Info", "setup sensor");
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
@@ -120,7 +131,6 @@ public class MainActivity extends AppCompatActivity {
                 accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
             } else {
                 // Sorry, there are no accelerometers on your device.
-                // You can't play this game.
             }
         }
         Log.i("Info", "register sensor listener");
@@ -138,13 +148,18 @@ public class MainActivity extends AppCompatActivity {
 
 
             public void handleMessage(Message msg) {
+                //long startTime = System.currentTimeMillis(); // message comes in
                 if (msg.what == handlerState) {
                     // String obtained by reading from byte buffer
                     String readMessage = (String) msg.obj;
                     String readingString = readingParser.parseReadings(readMessage);
 
 
+
                     if (readingString != null) {
+                        // initialize graphs
+
+
                         // full set of readings received -> initialize/run appropriate filter
                         // Log.i("parsed reading" , readingString);
                         //Log.i("count", Integer.toString(counter++));
@@ -161,48 +176,13 @@ public class MainActivity extends AppCompatActivity {
 
 
                         if (obstacleDetected(measurements)) {
-                            // instantiate correct filter
-                            filter = initFilter(filter, splitDoubleReadings);
 
-//                            if (filter == null) {
-//                                // initialize filter with first set of readings making up part of the state with assumed 0 velocity
-//                                splitDoubleReadings.add(0d);
-//                                Double[] stateArray = splitDoubleReadings.toArray(new Double[splitDoubleReadings.size()]);
-//
-//                                RealVector initialState = new ArrayRealVector(stateArray);
-//
-//                                filter = new ObstacleKalmanFilter(initialState);
-//                                Log.i("initialState used", initialState.toString());
-//                                Log.i("initial covariance", filter.getStateCovarianceMatrix().toString());
-//                                eventDetection = new EventDetection();
-//                                eventDetection.addStateEstimate(initialState);
-//                            } else {
-//                                // check if moving or not
-//                                RealVector[] previousEstimates = eventDetection.getStateEstimates();
-//                                boolean[] distanceChangedArray = eventDetection.getChangedDistanceIndex(previousEstimates);
-//
-//                                boolean isMoving = isMoving(distanceChangedArray);
-//                                filter = initMovingFilter(isMoving, filter); // instantiate new filter using if
-//
-//                                counter++;
-//
-//                                // run filter
-//                                filter.predict();
-//                                //Log.i("filter prediction", filter.getStateEstimationVector().toString());
-//                                filter.correct(measurements);
-//                                filterEstimateTextView.setText(filter.getStateEstimationVector().toString());
-//                                eventDetection.addStateEstimate(filter.getStateEstimationVector());
-//                                if (counter % 5 == 0) {
-//                                    Log.i("Filter Estimate", filter.getStateEstimationVector().toString());
-//                                }
-//
-//                                //Log.i("state estimate", filter.getStateEstimationVector().toString());
-//                                //Log.i("state covariance", filter.getStateCovarianceMatrix().toString());
-//
-//
-//                            }
+                            filter = initFilter(filter, splitDoubleReadings);
+                            //long startTime = SystemClock.uptimeMillis();
                             filter.predict();
                             filter.correct(measurements);
+                        
+
                             RealVector stateEstimateVector = filter.getStateEstimationVector();
                             String stateEstimate = "";
 
@@ -215,15 +195,19 @@ public class MainActivity extends AppCompatActivity {
                                 }
 
                             }
-                            // eventDetection.addStateEstimate(filter.getStateEstimationVector());
-                            filterEstimateTextView.setText(stateEstimate);
+                            // eventDetection.addStateEstimate(filter.getStateEstimationVector());/
+                            filterEstimateTextView.setText(stateEstimateVector.toString());
+//                            long endTime = System.currentTimeMillis();
+//                            long elapsedTime = endTime - startTime;
+//                            Log.i("Response Time", Long.toString(elapsedTime)); // estimate of total response time from receiving a message
                            // Log.i("state estimate", stateEstimate);
 
                             //Log.i("state covariance", filter.getStateCovarianceMatrix().toString());
                             // log readings to CSv file
                             String logReadings = readingString + "," + stateEstimate;
-                            Log.i("log reading", logReadings);
+                            //Log.i("log reading", logReadings);
                             saveToCSV(launchTimeStamp, logReadings);
+                            Log.i("covariance", filter.getStateCovarianceMatrix().toString());
 
                             // reset filter if estimates are negative (applies for moving case)
                             if (areEstimatesNegative(stateEstimateVector)) {
@@ -524,7 +508,7 @@ public class MainActivity extends AppCompatActivity {
 //                            bufferSize++;
 //                        }
 //                    }
-                    //Log.i("Buffer size", Integer.toString(bufferSize));
+//                    Log.i("Buffer size", Integer.toString(bufferSize));
                     // TODO handle NullPointerException
                     String readMessage = new String(buffer, 0, bytes);
                     // Send the obtained bytes to the UI Activity via handler
@@ -683,6 +667,14 @@ public class MainActivity extends AppCompatActivity {
         if (filter == null) {
             // initialize filter for first time
             filter = initStationaryFilter(splitDoubleReadings);
+            FilterObserver drawLeftIRGraph = new DrawLineGraph("Left IR Readings",0, leftIRGraph);
+            FilterObserver drawUltrasoundGraph = new DrawLineGraph("Ultrasound Readings", 1, ultrasoundGraph);
+            FilterObserver drawRightIRGraph = new DrawLineGraph("Right IR Readings", 2, rightIRGraph);
+
+            // register observer
+            filter.registerObserver(drawLeftIRGraph);
+            filter.registerObserver(drawUltrasoundGraph);
+            filter.registerObserver(drawRightIRGraph);
 
         } else {
 

@@ -27,18 +27,26 @@ import org.apache.commons.math3.linear.ArrayRealVector;
 import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.linear.RealVector;
 
+import java.util.ArrayList;
+import java.util.Observer;
+
 
 /*
  * implementation of a basic Kalman Filter using the Apache common
  * KalmanFilter library
  */
-public class ObstacleKalmanFilter  {
+public class ObstacleKalmanFilter implements FilterSubject {
     private KalmanFilter filter;
+    private ArrayList<FilterObserver> observers = new ArrayList<FilterObserver>();
+    private RealVector prediction;
+    private RealVector measurement;
+    private RealVector estimate;
+    private int currentTimeStep = 0;
 
     // TODO Extra add constructor that allows user to set all of the matrices if they desire
     // TODO Add constructur parameters to be used for X0, Z0;
     public ObstacleKalmanFilter() {
-        final double dt = 0.2; // time delta in seconds
+        final double dt = 0.05; // time delta in seconds
         final double velocity = 1; // TODO hard-coded for dev purposes use dynamic velocity later
 
 
@@ -83,11 +91,12 @@ public class ObstacleKalmanFilter  {
 
         // sensor error covariance matrix
         RealMatrix R = new Array2DRowRealMatrix(new double[][] {
-                { 47, 0, 0 },
-                { 0, 100, 0 },
-                { 0, 0, 96 }
+                {47.6 , 0, 0 },
+                { 0, 120.8, 0 },
+                { 0, 0, 97.7 }
 
         });
+
 
         // Initial state estimate
         RealVector X0 = new ArrayRealVector(new double[] { 1.5, 1.5, 1.5, 1 });
@@ -135,7 +144,7 @@ public class ObstacleKalmanFilter  {
     }
 
     public ObstacleKalmanFilter(RealVector initialState) {
-        final double dt = 0.2; // time delta
+        final double dt = 0.05; // time delta
         final double velocity = 1; // TODO hard-coded for dev purposes use dynamic velocity later
 
 
@@ -181,9 +190,12 @@ public class ObstacleKalmanFilter  {
 
         // sensor error covariance matrix
         RealMatrix R = new Array2DRowRealMatrix(new double[][] {
-                { 47, 0, 0 },
-                { 0, 100, 0 },
-                { 0, 0, 96 }
+//                { 47, 0, 0 },
+//                { 0, 100, 0 },
+//                { 0, 0, 96 }
+                {47.6 , 0, 0 },
+                { 0, 120.8, 0 },
+                { 0, 0, 97.7 }
 
         });
 
@@ -233,7 +245,7 @@ public class ObstacleKalmanFilter  {
     }
 
     public ObstacleKalmanFilter(RealVector initialState, RealMatrix initialCovariance) {
-        final double dt = 0.2; // time delta
+        final double dt = 0.05; // time delta
         final double velocity = 1; // TODO hard-coded for dev purposes use dynamic velocity later
 
 
@@ -274,9 +286,13 @@ public class ObstacleKalmanFilter  {
 
         // sensor error covariance matrix
         RealMatrix R = new Array2DRowRealMatrix(new double[][] {
-                { 47, 0, 0 },
-                { 0, 100, 0 },
-                { 0, 0, 96 }
+//                { 47, 0, 0 },
+//                { 0, 100, 0 },
+//                { 0, 0, 96 }
+                {47.6 , 0, 0 },
+                { 0, 120.8, 0 },
+                { 0, 0, 97.7 }
+
 
         });
 
@@ -310,7 +326,14 @@ public class ObstacleKalmanFilter  {
 
     // takes measurement as a vector
     public void correct(RealVector z) {
+        Log.i("Filter status", "Filter was corrected");
+        prediction = this.getStateEstimationVector(); // stores state vector
         filter.correct(z);
+        measurement = z;
+        estimate = filter.getStateEstimationVector(); // gets updated state vector
+        currentTimeStep += 50; // 50 ms increments
+        notifyFilterObservers();
+
     }
 
 
@@ -323,4 +346,26 @@ public class ObstacleKalmanFilter  {
         return filter.getErrorCovarianceMatrix();
     }
 
+    @Override
+    public void registerObserver(FilterObserver o) {
+        observers.add(o);
+    }
+
+    @Override
+    public void removeFilterObserver(FilterObserver o) {
+        int i = observers.indexOf(o);
+        if (i >= 0) {
+            observers.remove(i);
+        }
+
+    }
+
+    // notifies all registered Observers with the vectors representing the prediction, measurement and estimated state vector after taking into account the measurement
+    @Override
+    public void notifyFilterObservers() {
+        for(int i = 0; i < observers.size(); i++) {
+            FilterObserver observer = observers.get(i);
+            observer.onFilterUpdate(prediction, measurement, estimate, currentTimeStep);
+        }
+    }
 }

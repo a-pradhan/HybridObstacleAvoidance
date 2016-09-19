@@ -27,4 +27,5 @@ dependencies {
     compile files('libs/LightHouseAPI.jar')
     compile 'com.google.android.gms:play-services-appindexing:8.1.0'
     compile files('libs/opencsv-3.8.jar')
+    compile files('libs/GraphView-4.2.0.jar')
 }

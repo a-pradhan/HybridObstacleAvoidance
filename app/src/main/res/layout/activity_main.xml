@@ -47,54 +47,58 @@
             android:onClick="visible"/>
     </LinearLayout>
 
-    <ListView
+    <ScrollView
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/listView"
-        android:layout_centerHorizontal="true"
+        android:layout_height="350dp"
+        android:id="@+id/scrollView"
         android:layout_below="@+id/linearLayout"
-        android:layout_above="@+id/linerLayoutBottom"
-        android:layout_marginBottom="180dp" />
+        >
 
 
-
-    <LinearLayout
-        android:orientation="horizontal"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:id="@+id/linerLayoutBottom">
-
-        <Button
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Connect"
-            android:id="@+id/btnConnect"
-            android:layout_alignParentBottom="true"
-            android:layout_centerHorizontal="true"
-            android:layout_gravity="center_horizontal" />
+            android:orientation="vertical">
+
+            <com.jjoe64.graphview.GraphView
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:id="@+id/graphLeftIR"
+            />
+            <com.jjoe64.graphview.GraphView
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:layout_below="@+id/graphLeftIR"
+                android:id="@+id/graphUltrasound"
+                />
+            <com.jjoe64.graphview.GraphView
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:layout_below="@+id/graphUltrasound"
+                android:id="@+id/graphRightIR"
+                />
+        </LinearLayout>
 
 
-        <Button
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Close Connection"
-            android:id="@+id/btnCloseConnection"
-            android:layout_below="@+id/listView"
-            android:layout_alignRight="@+id/listView"
-            android:layout_alignEnd="@+id/listView"
-            android:onClick="closeBluetoothConnection" />
+    </ScrollView>
 
-    </LinearLayout>
 
+    <!--<ListView-->
+        <!--android:layout_width="wrap_content"-->
+        <!--android:layout_height="wrap_content"-->
+        <!--android:id="@+id/listView"-->
+        <!--android:layout_centerHorizontal="true"-->
+        <!--android:layout_below="@+id/linearLayout"-->
+        <!--android:layout_above="@+id/linerLayoutBottom"-->
+        <!--android:layout_marginBottom="180dp" />-->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:id="@+id/sensorReadingsTitle"
         android:text="Sensor Readings:"
-        android:layout_alignBottom="@+id/listView"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"
+        android:layout_below="@+id/scrollView"
         android:textSize="20sp"
         android:textColor="#000000" />
 
@@ -126,4 +130,38 @@
         android:id="@+id/filterEstimateTextView"
         android:text=""
         android:layout_below="@+id/filterEstimateTitle" />
+
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_below="@+id/filterEstimateTextView"
+        android:id="@+id/linearLayoutBottom"
+        >
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Connect"
+            android:id="@+id/btnConnect"
+            android:layout_alignParentBottom="true"
+            android:layout_centerHorizontal="true"
+            android:layout_gravity="center_horizontal" />
+
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Close Connection"
+            android:id="@+id/btnCloseConnection"
+            android:layout_below="@+id/listView"
+            android:layout_alignRight="@+id/listView"
+            android:layout_alignEnd="@+id/listView"
+            android:onClick="closeBluetoothConnection" />
+
+    </LinearLayout>
+
+
 </RelativeLayout>
