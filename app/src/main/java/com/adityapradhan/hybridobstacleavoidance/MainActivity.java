@@ -52,12 +52,11 @@ import java.io.OutputStreamWriter;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Set;
 import java.util.UUID;
-import java.util.logging.Filter;
 
-import ucl.LightHouse.LightHouseAPI;
+
+
 
 public class MainActivity extends AppCompatActivity {
 
@@ -80,9 +79,7 @@ public class MainActivity extends AppCompatActivity {
     private Handler mSensorHandler;
     private GraphView leftIRGraph, ultrasoundGraph, rightIRGraph;
 
-
-    EventDetection eventDetection;
-    private ObstacleKalmanFilter filter;
+    private KFilter filter;
 
 
     //    private long lastUpdate = 0;
@@ -111,7 +108,6 @@ public class MainActivity extends AppCompatActivity {
         final TextView receivedDataTextView = (TextView) findViewById(R.id.receivedDataTextView);
         final TextView filterEstimateTextView = (TextView) findViewById(R.id.filterEstimateTextView);
         final ReadingParser readingParser = new ReadingParser();
-        eventDetection = new EventDetection();
         launchTimeStamp = new SimpleDateFormat("yyyy.MM.dd.HH.mm.ss").format(new Date());
 
         // initialize Graph Views
@@ -121,7 +117,7 @@ public class MainActivity extends AppCompatActivity {
 
 
 
-        // setup accelerometer
+        // setup accelerometer sensing
         Log.i("Info", "setup sensor");
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         accelerometer = null;
@@ -138,33 +134,28 @@ public class MainActivity extends AppCompatActivity {
         // http://stackoverflow.com/questions/3286815/sensoreventlistener-in-separate-thread
         mSensorThread = new HandlerThread("Sensor thread", Thread.MAX_PRIORITY);
         mSensorThread.start();
-        mSensorHandler = new Handler(mSensorThread.getLooper()); //Blocks until looper is prepared, which is fairly quick
+        mSensorHandler = new Handler(mSensorThread.getLooper()); //Blocks until looper is prepared
         sensorManager.registerListener(new AccelerometerListener(movementDetection), accelerometer, SensorManager.SENSOR_DELAY_NORMAL, mSensorHandler);
 
 
-        // initialize handler object to receive messages sent by bluetooth module
-        //TODO create new Handler class for this method
+        // initialize handler object to receive readings sent by bluetooth module and perform filtering
         bluetoothIn = new Handler() {
 
 
             public void handleMessage(Message msg) {
                 //long startTime = System.currentTimeMillis(); // message comes in
                 if (msg.what == handlerState) {
-                    // String obtained by reading from byte buffer
+                    // String obtained from connectedThread
                     String readMessage = (String) msg.obj;
                     String readingString = readingParser.parseReadings(readMessage);
 
 
 
-                    if (readingString != null) {
-                        // initialize graphs
+                    if (readingString != null) { // full set of readings received
 
-
-                        // full set of readings received -> initialize/run appropriate filter
-                        // Log.i("parsed reading" , readingString);
-                        //Log.i("count", Integer.toString(counter++));
                         receivedDataTextView.setText(readingString);
-                        // separate readings and arrange in a measurement vector
+
+                        // separate readings, convert to double  and arrange in a measurement vector
                         String[] splitStringReadings = readingString.split(",");
                         ArrayList<Double> splitDoubleReadings = new ArrayList<Double>(splitStringReadings.length + 1); // extra to hold velocity, which is not measured
 
@@ -176,9 +167,9 @@ public class MainActivity extends AppCompatActivity {
 
 
                         if (obstacleDetected(measurements)) {
+                            // at least 1 of the readings is in the sensors rated range
 
                             filter = initFilter(filter, splitDoubleReadings);
-                            //long startTime = SystemClock.uptimeMillis();
                             filter.predict();
                             filter.correct(measurements);
                         
@@ -195,17 +186,9 @@ public class MainActivity extends AppCompatActivity {
                                 }
 
                             }
-                            // eventDetection.addStateEstimate(filter.getStateEstimationVector());/
-                            filterEstimateTextView.setText(stateEstimateVector.toString());
-//                            long endTime = System.currentTimeMillis();
-//                            long elapsedTime = endTime - startTime;
-//                            Log.i("Response Time", Long.toString(elapsedTime)); // estimate of total response time from receiving a message
-                           // Log.i("state estimate", stateEstimate);
 
-                            //Log.i("state covariance", filter.getStateCovarianceMatrix().toString());
-                            // log readings to CSv file
+                            filterEstimateTextView.setText(stateEstimateVector.toString());
                             String logReadings = readingString + "," + stateEstimate;
-                            //Log.i("log reading", logReadings);
                             saveToCSV(launchTimeStamp, logReadings);
                             Log.i("covariance", filter.getStateCovarianceMatrix().toString());
 
@@ -223,9 +206,6 @@ public class MainActivity extends AppCompatActivity {
 
 
                     }
-
-
-                    // check if slowed/accelerating/user turned and reinitialize Filter object with latest estimate and current covariance matrix;
 
 
                 }
@@ -281,54 +261,9 @@ public class MainActivity extends AppCompatActivity {
         // ATTENTION: This was auto-generated to implement the App Indexing API.
         // See https://g.co/AppIndexing/AndroidStudio for more information.
         client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
-    }
-
-    // button onClick methods
-    public void on(View v) {
-        // turn on bluetooth
-
-        if (!BA.isEnabled()) {
-            Intent turnOn = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivityForResult(turnOn, 0);
-            Toast.makeText(getApplicationContext(), "Bluetooth Turned On", Toast.LENGTH_LONG).show();
-        }
-    }
-
-    public void off(View v) {
-        // turn off bluetooth
-        BA.disable();
-        Toast.makeText(getApplicationContext(), "Bluetooth Turned Off", Toast.LENGTH_LONG).show();
-    }
-
-    public void list(View v) {
-        // view paired devices
-        pairedDevices = BA.getBondedDevices();
-        ArrayList list = new ArrayList();
-
-        for (BluetoothDevice device : pairedDevices) {
-            list.add(device.getName() + "\n" + device.getAddress());
-        }
-        Toast.makeText(getApplicationContext(), "Showing Paired Devices", Toast.LENGTH_SHORT).show();
-
-        ArrayAdapter adapter = new ArrayAdapter(this, android.R.layout.simple_list_item_1, list);
-        listView.setAdapter(adapter);
+    } // end of onCreate() method
 
 
-    }
-
-    public void visible(View v) {
-        // view visible devices
-        Intent getVisible = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
-        startActivityForResult(getVisible, 0);
-    }
-
-    public void closeBluetoothConnection(View view) {
-        if (connectThread != null) {
-            connectThread.cancel();
-            Log.i("Bluetooth", "bluetooth connection closed successfully");
-        }
-
-    }
 
     @Override
     public void onStart() {
@@ -348,7 +283,7 @@ public class MainActivity extends AppCompatActivity {
                 Uri.parse("android-app://com.adityapradhan.bluetoothtutorialspoint/http/host/path")
         );
         AppIndex.AppIndexApi.start(client, viewAction);
-    }
+    } // end of onStart method
 
     @Override
     public void onStop() {
@@ -368,31 +303,10 @@ public class MainActivity extends AppCompatActivity {
         );
         AppIndex.AppIndexApi.end(client, viewAction);
         client.disconnect();
-    }
+    } // end of onStop method
 
-//    @Override
-//    public void onSensorChanged(SensorEvent sensorEvent) {
-//        Sensor mySensor = sensorEvent.sensor;
-//
-//
-//        if (mySensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-//            float x = sensorEvent.values[0];
-//            float y = sensorEvent.values[1];
-//            float z = sensorEvent.values[2];
-//            long currTime = System.currentTimeMillis();
-//
-//            movementDetection.recAccelerometerChange(x,y,z,currTime);
-//
-//        }
-//
-//    }
-//
-//    @Override
-//    public void onAccuracyChanged(Sensor sensor, int i) {
-//
-//    }
 
-    // interface with bluetooth module
+    // thread to establish connection with bluetooth module
     private class ConnectThread extends Thread {
         private final BluetoothSocket mmSocket;
         private final BluetoothDevice mmDevice;
@@ -435,7 +349,7 @@ public class MainActivity extends AppCompatActivity {
                 mmSocket.connect();
                 Log.d("device connected", "bluetooth connection successful");
             } catch (IOException connectException) {
-                // Unable to connect. Close the socket and get out
+                // Unable to connect. Close the socket
                 try {
                     mmSocket.close();
                 } catch (IOException closeException) {
@@ -460,6 +374,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // Thread to receive stream of bytes, corresponding to sensor readings from bluetooth module
     private class ConnectedThread extends Thread {
         private final BluetoothSocket mmSocket;
         private final InputStream mmInStream;
@@ -487,140 +402,80 @@ public class MainActivity extends AppCompatActivity {
         }
 
         public void run() {
-              // Resource: https://wingoodharry.wordpress.com/2014/04/15/android-sendreceive-data-with-arduino-using-bluetooth-part-2/
-//            byte[] buffer = new byte[1024];  // buffer store for the stream
-//            int begin = 0;
-//            int bytes;  // bytes returned from read()
+            // Resource: https://wingoodharry.wordpress.com/2014/04/15/android-sendreceive-data-with-arduino-using-bluetooth-part-2/
+            byte[] buffer = new byte[512]; // buffer to store stream of bytes received from bluetooth
+            int bytes; // number of bytes in the buffer
 
-            byte[] buffer = new byte[512];
-            int bytes;
-
-            // Keep looping to listen for received messages
+            // Keep looping to listen for input received via Bluetooth
             while (true) {
                 try {
                     // read in bytes from Input Stream into buffer and store number of bytes retrieved
                     bytes = mmInStream.read(buffer);
 
                     // print out number of bytes in buffer
-//                    int bufferSize = 0;
-//                    for (byte x : buffer) {
-//                        if (x > 0) {
-//                            bufferSize++;
-//                        }
-//                    }
-//                    Log.i("Buffer size", Integer.toString(bufferSize));
-                    // TODO handle NullPointerException
+                    // Log.i("Buffer size", Integer.toString(bytes));
+
+
+                   // create String using bytes from the byte buffer
                     String readMessage = new String(buffer, 0, bytes);
-                    // Send the obtained bytes to the UI Activity via handler
+
+                    // send String obtained to the UI Activity handler bluetoothIn
                     bluetoothIn.obtainMessage(handlerState, bytes, -1, readMessage).sendToTarget();
                 } catch (IOException e) {
-                    break;
+                    e.printStackTrace();
                 }
             }
+      }
 
+    }
 
-            // Keep listening to the InputStream until an exception occurs
-//            while (true) {
-//                try {
-//                    // Read from the InputStream
-//                    bytes += mmInStream.read(buffer, bytes, buffer.length - bytes);
-//                    for (int i = begin; i < bytes; i++) {
-//                        if (buffer[i] == "#".getBytes()[0]) {
-//                            // Send the obtained bytes to the UI activity
-//                            mHandler.obtainMessage(1, begin, i, buffer).sendToTarget();
-//                            begin = i + 1;
-//                            if (i == bytes - 1) {
-//                                bytes = 0;
-//                                begin = 0;
-//                            }
-//                        }
-//                    }
-//                } catch (IOException e) {
-//                    break;
-//                }
-//            }
+    // button onClick methods
+    public void on(View v) {
+        // turn on bluetooth
 
-//            while (true) {
-//
-//                try {
-//                    // Read from Input Stream
-//                    bytes = mmInStream.read(buffer);
-//                    // Send the obtained bytes to the UI activity
-//                    mHandler.obtainMessage(9999,bytes, -1, buffer).sendToTarget();
-//                } catch (IOException e) {
-//                    break;
-//                }
-//            }
-//
-//        }
-
-        /* Call this from the main activity to send data to the remote device */
+        if (!BA.isEnabled()) {
+            Intent turnOn = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivityForResult(turnOn, 0);
+            Toast.makeText(getApplicationContext(), "Bluetooth Turned On", Toast.LENGTH_LONG).show();
         }
+    }
 
-        public void write(byte[] bytes) {
-            try {
-                mmOutStream.write(bytes);
-            } catch (IOException e) {
-            }
-        }
+    public void off(View v) {
+        // turn off bluetooth
+        BA.disable();
+        Toast.makeText(getApplicationContext(), "Bluetooth Turned Off", Toast.LENGTH_LONG).show();
+    }
 
-        /* Call this from the main activity to shutdown the connection */
-        public void cancel() {
-            try {
-                mmSocket.close();
-            } catch (IOException e) {
-            }
+    public void list(View v) {
+        // view paired devices
+        pairedDevices = BA.getBondedDevices();
+        ArrayList list = new ArrayList();
+
+        for (BluetoothDevice device : pairedDevices) {
+            list.add(device.getName() + "\n" + device.getAddress());
         }
+        Toast.makeText(getApplicationContext(), "Showing Paired Devices", Toast.LENGTH_SHORT).show();
+
+        ArrayAdapter adapter = new ArrayAdapter(this, android.R.layout.simple_list_item_1, list);
+        listView.setAdapter(adapter);
 
 
     }
 
-    public void uploadData(String IRLeft, String US, String IRRight) {
-
-
-        WifiManager wifiMgr = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-        if (wifiMgr.isWifiEnabled()) {
-            // WiFi adapter is ON
-            WifiInfo wifiInfo = wifiMgr.getConnectionInfo();
-            if (wifiInfo.getNetworkId() == -1) {
-                // Not connected to an access-Point
-                Log.i("Readings Upload", "Wifi not connected. Readings were not sent");
-
-            } else {
-                // Connected to an Access Point
-                LightHouseAPI lighthouse = new LightHouseAPI();
-                HashMap<String, String> readings = new HashMap<String, String>();
-                // ID
-                String deviceID = Settings.Secure.ANDROID_ID;
-                readings.put("ID", deviceID);
-
-
-                // Timestamp
-                long timestamp = System.currentTimeMillis();
-                readings.put("Timestamp", Long.toString(timestamp));
-
-                // sensor_type
-
-                // Distance
-                readings.put("IRLeft", IRLeft);
-                readings.put("Distance", IRLeft);
-                readings.put("Ultrasound", US);
-                readings.put("IRRight", IRRight);
-
-
-                // Send readings to UDP port on server
-                boolean response = lighthouse.sendSensorDataSync(readings);
-                Log.i("Data Sync Response", Boolean.toString(response));
-            }
-
-        } else {
-            // WiFi adapter is OFF
-            Log.i("Data Upload", "Wifi is not turned on. Readings were not sent");
-        }
-
-
+    public void visible(View v) {
+        // view visible devices
+        Intent getVisible = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
+        startActivityForResult(getVisible, 0);
     }
 
+    // turn off device Bluetooth
+    public void closeBluetoothConnection(View view) {
+        if (connectThread != null) {
+            connectThread.cancel();
+            Log.i("Bluetooth", "bluetooth connection closed successfully");
+        }
+
+    }
 
     // assess whether user is moving by checking changedDistancesArray
     public boolean isMoving(boolean[] distanceChangedArray) {
@@ -634,56 +489,54 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    public ObstacleKalmanFilter initStationaryFilter(ArrayList<Double> splitDoubleReadings) {
+    public KFilter initStationaryFilter(ArrayList<Double> splitDoubleReadings) {
         // initial sensor readings used to provide initial state for model
         splitDoubleReadings.add(0d); // velocity set to 0
         Double[] stateArray = splitDoubleReadings.toArray(new Double[splitDoubleReadings.size()]);
         RealVector initialState = new ArrayRealVector(stateArray); // state vector
 
-        filter = new ObstacleKalmanFilter(initialState);
+        filter = new StationaryKalmanFilter(initialState);
         Log.i("initialState used", initialState.toString());
         Log.i("initial covariance", filter.getStateCovarianceMatrix().toString());
-
-        eventDetection.addStateEstimate(initialState);
 
         return filter;
 
     }
 
     // returns adjusted filter if user is moving
-    public ObstacleKalmanFilter initMovingFilter(boolean isMoved, ObstacleKalmanFilter filter) {
+    public KFilter initMovingFilter(boolean isMoved, KFilter currFilter) {
         if (isMoved == true) {
             // if moving reinstantiate filter -  set initial velocity to 1 m/s and use current state estimate and covariance matrix
             Log.i("Movement detected", "Initializing moving filter");
-            RealVector initialState = filter.getStateEstimationVector();
-            RealMatrix initialCovarianceMatrix = filter.getStateCovarianceMatrix();
+            RealVector initialState = currFilter.getStateEstimationVector();
+            RealMatrix initialCovarianceMatrix = currFilter.getStateCovarianceMatrix();
             initialState.setEntry(3, -50); // set velocity to desired value - obtain dynamically in future
-            filter = new ObstacleKalmanFilter(initialState, initialCovarianceMatrix);
+            filter = new StationaryKalmanFilter(initialState, initialCovarianceMatrix);
         }
         return filter;
     }
 
-    public ObstacleKalmanFilter initFilter(ObstacleKalmanFilter filter, ArrayList<Double> splitDoubleReadings) {
-        if (filter == null) {
+    public KFilter initFilter(KFilter currFilter, ArrayList<Double> splitDoubleReadings) {
+        if (currFilter == null) {
             // initialize filter for first time
             filter = initStationaryFilter(splitDoubleReadings);
+            FilterSubject filterObservable = (FilterSubject) filter;
+
+            // initialization of graphs
             FilterObserver drawLeftIRGraph = new DrawLineGraph("Left IR Readings",0, leftIRGraph);
             FilterObserver drawUltrasoundGraph = new DrawLineGraph("Ultrasound Readings", 1, ultrasoundGraph);
             FilterObserver drawRightIRGraph = new DrawLineGraph("Right IR Readings", 2, rightIRGraph);
 
-            // register observer
-            filter.registerObserver(drawLeftIRGraph);
-            filter.registerObserver(drawUltrasoundGraph);
-            filter.registerObserver(drawRightIRGraph);
+            // register observers
+            filterObservable.registerObserver(drawLeftIRGraph);
+            filterObservable.registerObserver(drawUltrasoundGraph);
+            filterObservable.registerObserver(drawRightIRGraph);
 
         } else {
 
             // initialize filter for person on the move
-            RealVector[] previousEstimates = eventDetection.getStateEstimates();
-            boolean[] distanceChangedArray = eventDetection.getChangedDistanceIndex(previousEstimates);
-            //boolean isMoving = isMoving(distanceChangedArray);
             boolean isMoving = movementDetection.isMoving();
-            filter = initMovingFilter(isMoving, filter); // instantiate new filter if moving other use existing
+            filter = initMovingFilter(isMoving, filter); // instantiate new filter if moving otherwise use existing
 
         }
 
@@ -718,87 +571,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // saves sensor/filter data to a csv log file
-    public void saveToCSV() {
-//        String baseDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS).getAbsolutePath();
-//        String FILENAME = "sensor_data.csv";
-//        String filepath = baseDir + File.separator + FILENAME;
-//        String entry = "1,2,3\n";
-//        File f = new
-
-//        try {
-//            // write to end of file if it exists
-//            FileOutputStream out = openFileOutput(filepath, Context.MODE_APPEND);
-//            out.write(entry.getBytes());
-//            out.close();
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-
-//        File dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
-//        File file = new File(dir, "sensor_readings.csv");
-//
-//        try {
-//            FileWriter fileWriter = new FileWriter(file);
-//            fileWriter.append("1,2,3");
-//            fileWriter.flush();
-//            fileWriter.close();
-//
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-
-//        String fileName = "example.csv";
-//        String dirName = "MyDirectory";
-//        String contentToWrite = "Your Content Goes Here";
-//        File myDir = new File("sdcard", dirName);
-//
-///*if directory doesn't exist, create it*/
-//        if(!myDir.exists())
-//            myDir.mkdirs();
-//
-//
-//        File myFile = new File(myDir, fileName);
-//
-///*Write to file*/
-//        try {
-//            FileWriter fileWriter = new FileWriter(myFile);
-//            fileWriter.append(contentToWrite);
-//            fileWriter.flush();
-//            fileWriter.close();
-//        }
-//        catch(IOException e){
-//            e.printStackTrace();
-//        }
-
-
-//        String data = "1,2,3";
-//        File baseDir = new File("/sdcard/Documents");
-//        String fileName = "test";
-//
-//        File file = new File(baseDir, fileName + ".csv");
-//        Log.i("Directory to Save", file.getAbsolutePath());
-//
-//        try {
-//            if (!file.exists()) {
-//                file.createNewFile();
-//            }
-//
-//            FileWriter fw = new FileWriter(file.getAbsolutePath());
-//            BufferedWriter bw = new BufferedWriter(fw);
-//            bw.write(data);
-//            bw.close();
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        } {
-//
-//        }
-
-
-
-
-    }
-
-public void saveToCSV(String timeStamp, String reading) {
+    public void saveToCSV(String timeStamp, String reading) {
     // Resource: http://blog.cindypotvin.com/saving-data-to-a-file-in-your-android-application/
     try
     {
@@ -828,38 +601,4 @@ public void saveToCSV(String timeStamp, String reading) {
     }
 }
 
-    public static boolean isSdReadable()
-    {
-
-        boolean mExternalStorageAvailable = false;
-        try
-        {
-            String state = Environment.getExternalStorageState();
-
-            if (Environment.MEDIA_MOUNTED.equals(state))
-            {
-                // We can read and write the media
-                mExternalStorageAvailable = true;
-                Log.i("isSdReadable", "External storage card is readable.");
-            }
-            else if (Environment.MEDIA_MOUNTED_READ_ONLY.equals(state))
-            {
-                // We can only read the media
-                Log.i("isSdReadable", "External storage card is readable.");
-                mExternalStorageAvailable = true;
-            }
-            else
-            {
-                // Something else is wrong. It may be one of many other
-                // states, but all we need to know is we can neither read nor
-                // write
-                mExternalStorageAvailable = false;
-                Log.i("isSdReadable", "Cannot read or write to storage");
-            }
-        } catch (Exception ex)
-        {
-
-        }
-        return mExternalStorageAvailable;
-    }
 } // end of class

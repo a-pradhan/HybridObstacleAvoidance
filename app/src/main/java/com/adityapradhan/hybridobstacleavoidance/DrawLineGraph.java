@@ -36,19 +36,6 @@ public class DrawLineGraph implements FilterObserver {
         this.graphView = graphView;
         drawGraph();
     }
-    // initialize with first prediction, readings and estimate values
-//    public DrawLineGraph(double prediction, double measurement, double estimate, String graphName, int stateVectorIndex, GraphView graphView) {
-//        this.prediction = prediction;
-//        this.measurement = measurement;
-//        this.estimate = estimate;
-//        this.graphName = graphName;
-//        this.stateVectorIndex = stateVectorIndex;
-//        this.graphView = graphView;
-//        if(this.prediction == null) {
-//            drawGraph(graphView);
-//        }
-//
-//    }
 
 
 

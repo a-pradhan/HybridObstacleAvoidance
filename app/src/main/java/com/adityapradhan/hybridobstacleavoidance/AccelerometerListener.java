@@ -5,8 +5,10 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 
-/**
- * Created by Aditya on 9/7/2016.
+/*
+ * AccelerometerListerner observes the readings from the device's accelerometer sensor and uses the
+ * MovementDetection object to record whether the changes in acceleration are significant or not
+ *
  */
 public class AccelerometerListener implements SensorEventListener {
     private MovementDetection movementDetection;
